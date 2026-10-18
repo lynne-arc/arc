@@ -379,7 +379,7 @@ async function showHome() {
 }
 document.addEventListener('click', e => { const o = e.target.closest('[data-open]'); if (o) openFile(o.dataset.open); });
 /* ---------- Agent teams (each member signs in to their own portal; team files show for all of them) ---------- */
-const PAGE_VERSION = 'p48';   // bump with every dashboard update, so Lynne can see if her browser has the latest page
+const PAGE_VERSION = 'p49';   // bump with every dashboard update, so Lynne can see if her browser has the latest page
 let TEAM_EDIT = null;
 function sharedNote(t) {
   const g = {}; (t.members || []).forEach(m => { const k = String(m.email || '').trim().toLowerCase(); if (k) (g[k] = g[k] || []).push(String(m.name || '').split(/\s+/)[0]); });
@@ -508,8 +508,9 @@ function renderPending() {
     : F.pending ? '<div class="banner" style="margin-bottom:16px"><div><b>This contract was read with an older version</b><div class="small muted">Press Read again to fill in the file.</div></div></div>' : '';
   const rr = $('#retryRead'); if (rr) rr.onclick = () => $('#rereadBtn') && $('#rereadBtn').click();
   const b = $('#confirmBtn');
-  if (b) b.onclick = () => { F.confirmed = new Date().toISOString(); tick('Contract dates confirmed'); renderFile(); changed(); toast('Confirmed. Reminders are on for this file.'); };
+  if (b) b.onclick = confirmReading;
 }
+function confirmReading() { F.confirmed = new Date().toISOString(); tick('Contract dates confirmed'); renderFile(); changed(); toast('Confirmed. Reminders are on for this file.'); }
 
 function people(role) { return (F.parties || []).filter(p => p.role === role); }
 // Same person entered twice (e.g. "Val Shelton" and "Valerie Shelton") → one entry, keeping the fuller name, company and contact details
@@ -570,8 +571,11 @@ function renderSummary() {
     (contract ? '<div class="cfile"><div><div class="n">' + esc(contract.name) + '</div><div class="m">' + esc(F.status) + (F.updated ? ' · updated ' + esc(new Date(F.updated).toLocaleDateString('en-US', {month:'short', day:'numeric'})) : '') + '</div></div>' +
       '<div class="btns"><button class="btn" data-view="' + esc(contract.id) + '">View contract</button><button class="btn ghost" id="rereadBtn">Read again</button></div></div>' : '') +
     (function () { const L = DOCS.find(x => x.id === F.listingDocId); return L ? '<div class="cfile"><div><div class="n">' + esc(L.name) + '</div><div class="m">Listing agreement</div></div><div class="btns"><button class="btn" data-view="' + esc(L.id) + '">View</button><button class="btn ghost" id="rereadListing">Read again</button></div></div>' : ''; })() +
+    (F.reading && !F.confirmed ? '<div class="btns" style="justify-content:space-between;align-items:center;background:#EEF2F9;border:1px solid #C9D3E6;border-radius:10px;padding:8px 10px;margin:0 0 8px"><span class="small"><b>Not confirmed yet.</b> Check these against the ' + (F.reading.kind === 'listing' ? 'listing agreement' : 'P&amp;S') + '.</span><button class="btn primary" id="confirmDates">Confirm dates</button></div>'
+      : F.reading && F.confirmed ? '<div class="small faint" style="margin:0 0 6px">✓ Dates confirmed ' + esc(new Date(F.confirmed).toLocaleString('en-US', {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'})) + '</div>' : '') +
     (rows || p.price ? '<table class="dates"><tr><th>Item</th><th style="text-align:right">Date</th></tr>' + (p.price ? '<tr><td>' + (isUA() ? 'Sale price' : 'List price') + '</td><td>' + esc(money(p.price)) + '</td></tr>' : '') + rows + '</table>' : '<div class="empty">No dates yet. Read the contract or add them in the Calendar.</div>') +
     '</div>';
+  const cd = $('#confirmDates'); if (cd) cd.onclick = confirmReading;
   const rl = $('#rereadListing');
   if (rl) rl.onclick = async () => {
     showWorking('Reading the listing agreement…', 'This usually takes 20–40 seconds.');
@@ -589,9 +593,22 @@ function autoDates() {
   const u = F.utilities || {}, close = F.dates.closing, out = [];
   if (!close) return out;
   const before = n => { const p = close.split('-').map(Number); return new Date(Date.UTC(p[0], p[1] - 1, p[2] - n)).toISOString().slice(0, 10); };
-  if (/Oil|Propane/.test(u.fuel || '')) out.push({ label: 'Fuel proration (' + u.fuel.toLowerCase() + ')', date: before(7), note: '1 week before closing' });
+  if (/Oil|Propane/.test(u.fuel || '')) out.push({ label: 'Fuel proration (' + u.fuel.toLowerCase() + ')', date: before(7), note: '1 week before closing', to: 'buyer agent' });
   if (/Water|Sewer/.test(u.waterSewer || '')) out.push({ label: 'Final ' + u.waterSewer.replace(/ only/, '').toLowerCase() + ' reading', date: before(14), note: '2 weeks before closing' });
   if (u.gas === 'Yes') out.push({ label: 'Gas meter reading', date: before(14), note: '2 weeks before closing' });
+  if (u.electric === 'Yes') out.push({ label: 'Electric meter reading', date: before(14), note: '2 weeks before closing' });
+  return out;
+}
+// For the title email: who handles each proration / meter reading on this file
+function prorationLines() {
+  const u = F.utilities || {}, out = [], town = (F.property || {}).town;
+  if (/Oil|Propane/.test(u.fuel || '')) out.push('Fuel (' + u.fuel.toLowerCase() + '): there is a fuel proration. The buyer agent will provide it.');
+  else if (u.fuel === 'None' && u.gas !== 'Yes' && u.electric !== 'Yes') out.push('Fuel: conveys with the property, no proration.');
+  else if (u.fuel === 'Not sure') out.push('Fuel: to be confirmed. If there is a proration, the buyer agent will provide it.');
+  if (u.gas === 'Yes') out.push('Natural gas: please arrange the final gas meter reading with the gas company' + (u.gasCo ? ' (' + u.gasCo + ')' : '') + '.');
+  if (u.electric === 'Yes') out.push('Electric heat: please arrange the final electric meter reading with the electric company.');
+  if (/Water|Sewer/.test(u.waterSewer || '')) out.push(u.waterSewer.replace(/ only/, '') + ': please arrange the final reading and proration with ' + (u.wsCo || (town ? 'the Town of ' + town : 'the town')) + '.');
+  else if (/private/.test(u.waterSewer || '')) out.push('Water / sewer: private well & septic, no proration.');
   return out;
 }
 function openViewer(id) {
@@ -678,10 +695,10 @@ function feeGaps(terms) {
   const cmp = a => (!a || feeNum(a.amount) == null || feeUnit(a.unit) !== feeUnit(s.unit)) ? null : Math.round((feeNum(a.amount) - feeNum(s.amount)) * 100) / 100;
   const a = F.buyerAgreementFee, ga = cmp(a);
   if (ga > 0) {
-    const w = a.waive || '', base = 'Buyer fee gap ' + show(a.unit, ga) + ' (agreement ' + show(a.unit, a.amount) + ', seller pays ' + show(a.unit, s.amount) + ')';
-    out.push({ key: 'gap-buyer', text: base + ': ' + (/^Yes/.test(w) ? 'agent is waiving it: get the signed waiver, and check it isn\'t charged at closing' :
-      /^Partly/.test(w) ? 'agent is waiving part, check the amount at closing' :
-      /^No/.test(w) ? 'buyer owes the difference, make sure it\'s on the closing statement' : 'ask the agent who covers it') });
+    const w = a.waive || '', gap = show(a.unit, ga), base = 'Buyer agreement ' + show(a.unit, a.amount) + ', seller paying ' + show(a.unit, s.amount) + ': ' + gap + ' short. ';
+    out.push({ key: 'gap-buyer', text: base + (/^Yes/.test(w) ? 'Agent is waiving the ' + gap + ': get the signed waiver and make sure it isn\'t charged at closing' :
+      /^Partly/.test(w) ? 'Agent is waiving part of the ' + gap + ': get the signed waiver and check the buyer\'s share on the closing statement' :
+      /^No/.test(w) ? 'Agent is having the buyer pay the ' + gap + ': make sure it\'s on the closing statement' : 'Agent to decide: buyer pays the ' + gap + ' or the agent waives it') });
   }
   const pb = psBasis(), ab = a && feeBasis(a.basis);
   if (pb && ab && pb !== ab) {
@@ -797,7 +814,7 @@ function renderCal() {
       (/dropped off/.test(F.depositMethod.method || '') ? '<label class="f">Drop-off office<input class="i" data-path="depositMethod.office" value="' + esc(F.depositMethod.office || '') + '"></label>' : '') + '</div>';
   const keyRow = ([k, l]) => { const st = metState(k, F.dates[k]); return { k, date: F.dates[k] || '', st, html: '<div class="calrow" title="' + esc(basis[k] || '') + '"><span>' + esc(l) + '</span><input class="i" type="date" data-path="dates.' + k + '" value="' + esc(F.dates[k] || '') + '"><span class="dchip" data-chip="' + k + '">' + (st === 'overdue' ? '<span style="color:var(--red);font-weight:600">Not ticked: ' + esc(MET_BY[k]) + '</span>' : F.dates[k] && k !== 'effective' ? when(F.dates[k]) : '') + '</span></div>' + (k === 'deposit' ? depRow() : '') }; };
   const custRow = (c, i) => ({ date: c.date || '', st: c.label ? metState('', c.date) : 'upcoming', html: '<div class="calrow"><input class="i" data-custom="' + i + '" data-cf="label" value="' + esc(c.label) + '" placeholder="What is due"><input class="i" type="date" data-custom="' + i + '" data-cf="date" value="' + esc(c.date || '') + '"><button class="btn ghost danger" data-delcustom="' + i + '" title="Remove">✕</button></div>' });
-  const autoRow = a => ({ date: a.date, st: metState('', a.date), html: '<div class="calrow" title="Moves with the closing date. On this day a request email to title / attorney is drafted for you."><span>' + esc(a.label) + '<div class="small faint">' + esc(a.note) + ' · email to title / attorney</div></span><span style="padding-left:9px">' + esc(fmt(a.date, true)) + '</span><span>' + when(a.date) + '</span></div>' });
+  const autoRow = a => ({ date: a.date, st: metState('', a.date), html: '<div class="calrow" title="Moves with the closing date. On this day a request email is drafted for you."><span>' + esc(a.label) + '<div class="small faint">' + esc(a.note) + ' · email to ' + (a.to || 'title / attorney') + '</div></span><span style="padding-left:9px">' + esc(fmt(a.date, true)) + '</span><span>' + when(a.date) + '</span></div>' });
   const byDate = (a, b) => (a.date || '9999') < (b.date || '9999') ? -1 : (a.date || '9999') > (b.date || '9999') ? 1 : 0;
   const contract = DATE_KEYS.filter(([k]) => termOn(k)).map(keyRow)
     .concat((F.custom || []).map((c, i) => [c, i]).filter(([c]) => !isListingDate(c.label)).map(([c, i]) => custRow(c, i)))
@@ -811,10 +828,11 @@ function renderCal() {
     (ua || !listing.length ? head('Contract dates') + show(contract) : '') +
     (listing.length ? head('Listing dates') + show(listing) : '') +
     (!ua && listing.length ? head('Contract dates') + show(contract) : '') +
-    (F.rep === 'Buyer side' ? '' : '<div class="row3" style="margin-top:10px;grid-template-columns:1fr 1fr 1fr">' +
+    ('<div class="row3" style="margin-top:10px;grid-template-columns:1fr 1fr 1fr 1fr">' +
       '<label class="f">Heating fuel<select class="i" data-path="utilities.fuel"><option></option>' + opt(['None', 'Oil', 'Propane', 'Oil & propane', 'Not sure'], (F.utilities || {}).fuel) + '</select></label>' +
       '<label class="f">Water / sewer<select class="i" data-path="utilities.waterSewer"><option></option>' + opt(['Water & sewer', 'Water only', 'Sewer only', 'No — private well & septic', 'Not sure'], (F.utilities || {}).waterSewer) + '</select></label>' +
-      '<label class="f">Gas meter reading<select class="i" data-path="utilities.gas"><option></option>' + opt(['Yes', 'No', 'Not sure'], (F.utilities || {}).gas) + '</select></label></div>') +
+      '<label class="f">Gas meter reading<select class="i" data-path="utilities.gas"><option></option>' + opt(['Yes', 'No', 'Not sure'], (F.utilities || {}).gas) + '</select></label>' +
+      '<label class="f">Electric meter reading<select class="i" data-path="utilities.electric"><option></option>' + opt(['Yes', 'No'], (F.utilities || {}).electric) + '</select></label></div>') +
     '<div class="btns" style="margin-top:10px">' + doneToggle('cal', past, 'past dates') + '<button class="btn" id="addCustom">+ Add a date</button></div></div>';
   $('#addCustom').onclick = () => { F.custom = F.custom || []; F.custom.push({ label: '', date: '', src: 'Lynne' }); renderCal(); changed(); };
 }
@@ -1071,6 +1089,7 @@ function buildEmail(kind) {
   return { to: emailsOf(tt), cc: agentsCc, subject: tag() + ': under agreement',
     body: hi + '\n\n' + where() + ' is under agreement. Here is everyone on the deal and how to reach them, along with the key dates. Please confirm receipt and let me know what you need from us.\n\n' +
       'Who is who\n' + whoIsWho(true) + '\n\nImportant dates\n' + datesBlock() + feeBlock('title') +
+      (prorationLines().length ? '\n\nProrations & meter readings\n' + prorationLines().join('\n') : '') +
       '\n\nPlease copy me (' + OWNER + ') on all correspondence.' + SIGNATURE };
 }
 const EMAIL_META = {
@@ -1132,7 +1151,7 @@ function renderLog() {
 }
 
 // Checklist items that only apply when that contingency is in the contract
-const CHECK_TERM = { 'Lender email sent': 'financing', 'Appraisal received': 'appraisal', 'Financing commitment received': 'financing', 'Inspection completed': 'inspection', 'Inspection resolved': 'inspection' };
+const CHECK_TERM = { 'Clear to close': 'financing', 'Lender email sent': 'financing', 'Appraisal received': 'appraisal', 'Financing commitment received': 'financing', 'Inspection completed': 'inspection', 'Inspection resolved': 'inspection' };
 function checkApplies(label) { return !CHECK_TERM[label] || F.terms[CHECK_TERM[label]] !== false; }
 function renderCheck() {
   let n = (F.checklist || []).filter(c => c.done).length;

@@ -36,6 +36,9 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--goldline);border
 .drop{border:2px dashed var(--goldline);border-radius:12px;padding:22px;text-align:center;background:#FFFFFF;cursor:pointer}
 .drop.on{background:var(--goldsoft)}
 .drop b{font-family:var(--serif);font-size:17px}
+.drop.sm{padding:14px;text-align:left}
+.drop.sm b{font-family:var(--sans);font-size:14px;font-weight:600}
+.drop.got{border-style:solid;background:var(--goldsoft)}
 .btn{background:var(--navy);color:#fff;border:0;border-radius:10px;padding:14px 22px;font:600 16px var(--sans);cursor:pointer;width:100%}
 .btn:disabled{opacity:.6;cursor:wait}
 .err{color:var(--red);font-size:14px;margin-top:10px}
@@ -225,8 +228,8 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--goldline);border
       <input type="file" id="pns" accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx" multiple hidden>
     </div>
     <div class="grid" id="agreements" style="margin-top:14px">
-      <label class="c6" id="agListingBox">Your signed listing agreement <span class="req">*</span><input type="file" id="agListing" accept="application/pdf,image/*,.doc,.docx"></label>
-      <label class="c6" id="agBuyerBox">Your signed buyer agency agreement <span class="req">*</span><input type="file" id="agBuyer" accept="application/pdf,image/*,.doc,.docx"></label>
+      <div class="c6 drop sm" id="agListingBox" tabindex="0" role="button" aria-label="Add your signed listing agreement"><b>Your signed listing agreement <span class="req">*</span></b><div class="hint" id="agListingMsg" style="margin:4px 0 0">Drop it here or tap to choose</div><input type="file" id="agListing" accept="application/pdf,image/*,.doc,.docx" hidden></div>
+      <div class="c6 drop sm" id="agBuyerBox" tabindex="0" role="button" aria-label="Add your signed buyer agency agreement"><b>Your signed buyer agency agreement <span class="req">*</span></b><div class="hint" id="agBuyerMsg" style="margin:4px 0 0">Drop it here or tap to choose · I check your fee against it</div><input type="file" id="agBuyer" accept="application/pdf,image/*,.doc,.docx" hidden></div>
     </div>
   </section>
 
@@ -367,6 +370,21 @@ drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add(
 drop.addEventListener('dragleave', () => drop.classList.remove('on'));
 drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('on'); takeFiles(e.dataTransfer.files); });
 pns.addEventListener('change', () => { takeFiles(pns.files); pns.value = ''; });
+// The agent's own agreement(s): each box takes a dropped file or a chosen one
+const agreeFile = {};
+['agListing', 'agBuyer'].forEach(id => {
+  const box = document.getElementById(id + 'Box'), inp = document.getElementById(id), msg = document.getElementById(id + 'Msg');
+  const take = list => { const f = (list || [])[0]; if (!f) return; agreeFile[id] = f; box.classList.add('got'); box.style.borderColor = ''; msg.textContent = '✓ ' + f.name + ' attached'; };
+  box.addEventListener('click', () => inp.click());
+  box.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inp.click(); } });
+  box.addEventListener('dragover', e => { e.preventDefault(); box.classList.add('on'); });
+  box.addEventListener('dragleave', () => box.classList.remove('on'));
+  box.addEventListener('drop', e => { e.preventDefault(); box.classList.remove('on'); take(e.dataTransfer.files); });
+  inp.addEventListener('change', () => { take(inp.files); inp.value = ''; });
+});
+// A file dropped beside a box shouldn't open in the browser and lose the form
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => e.preventDefault());
 // Listing: any number of documents, filed as agent uploads. Under agreement: the executed P&S.
 function takeFiles(list) {
   list = Array.from(list || []); if (!list.length) return;
@@ -389,11 +407,11 @@ form.addEventListener('submit', async e => {
   const bad = Array.from(form.querySelectorAll('[required]')).filter(el => !el.closest('[hidden]')).filter(el => !el.value.trim() || (el.type === 'email' && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(el.value.trim())));
   if (bad.length) { err.textContent = 'Please complete the highlighted fields.'; err.hidden = false; bad.forEach(el => el.style.borderColor = '#8B3A3A'); bad[0].focus(); return; }
   const agreeIn = [['listing', 'agListing', 'listing agreement'], ['buyer', 'agBuyer', 'buyer agency agreement']].filter(([, id]) => !document.getElementById(id + 'Box').hidden);
-  const missing = agreeIn.filter(([, id]) => !document.getElementById(id).files.length);
-  if (missing.length) { err.textContent = 'Please add your signed ' + missing.map(m => m[2]).join(' and ') + '.'; err.hidden = false; document.getElementById(missing[0][1]).focus(); return; }
+  const missing = agreeIn.filter(([, id]) => !agreeFile[id]);
+  if (missing.length) { err.textContent = 'Please add your signed ' + missing.map(m => m[2]).join(' and ') + ' (drop it in its box under Documents).'; err.hidden = false; missing.forEach(m => document.getElementById(m[1] + 'Box').style.borderColor = '#8B3A3A'); document.getElementById(missing[0][1] + 'Box').focus(); return; }
   const readFile = file => new Promise((ok, no) => { if (file.size > 15 * 1048576) return no(new Error(file.name + ' is over 15 MB')); const r = new FileReader(); r.onload = () => ok({ name: file.name, mime: file.type || 'application/pdf', b64: String(r.result).split(',')[1] }); r.onerror = () => no(new Error('Could not read ' + file.name)); r.readAsDataURL(file); });
   let agreements = [];
-  try { agreements = await Promise.all(agreeIn.map(async ([kind, id]) => Object.assign({ kind }, await readFile(document.getElementById(id).files[0])))); }
+  try { agreements = await Promise.all(agreeIn.map(async ([kind, id]) => Object.assign({ kind }, await readFile(agreeFile[id])))); }
   catch (x) { err.textContent = x.message; err.hidden = false; return; }
   const data = {}; new FormData(form).forEach((v, k) => { if (typeof v === 'string') data[k] = v.trim(); });
   if (data.depOffice === 'Other Verani office' && data.depOfficeOther) data.depOffice = data.depOfficeOther;
