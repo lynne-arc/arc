@@ -380,7 +380,7 @@ async function showHome() {
 }
 document.addEventListener('click', e => { const o = e.target.closest('[data-open]'); if (o) openFile(o.dataset.open); });
 /* ---------- Agent teams (each member signs in to their own portal; team files show for all of them) ---------- */
-const PAGE_VERSION = 'p50';   // bump with every dashboard update, so Lynne can see if her browser has the latest page
+const PAGE_VERSION = 'p51';   // bump with every dashboard update, so Lynne can see if her browser has the latest page
 let TEAM_EDIT = null;
 function sharedNote(t) {
   const g = {}; (t.members || []).forEach(m => { const k = String(m.email || '').trim().toLowerCase(); if (k) (g[k] = g[k] || []).push(String(m.name || '').split(/\s+/)[0]); });
@@ -922,7 +922,7 @@ function renderDocs() {
    base    → everyone: what the contract commits the seller to pay the buyer's brokerage
    buyer   → buyer, title, lender (never the listing agent or seller): the buyer owes the difference under their buyer agreement
    listing → seller, title (never the buyer's agent, buyer or lender): the listing firm is reducing its fee to cover a higher co-broke */
-const FEE_AUDIENCE = { all: ['base'], agents: ['base'], buyerClient: [], sellerClient: [], title: [], lender: [] };   // fees only go to the agents, never clients, title or lender
+const FEE_AUDIENCE = { all: [], agents: [], buyerClient: [], sellerClient: [], title: [], lender: [] };   // fees never go in emails or the contract summary: they stay on the dashboard only
 function feeNotes() {
   const ct = F.contractTerms || {}, s = ct.buyerFee, out = {};
   const show = (u, v) => feeUnit(u) === '$' ? money(v) : String(v).replace(/%$/, '') + '%';
