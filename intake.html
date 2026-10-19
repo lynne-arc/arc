@@ -36,9 +36,8 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--goldline);border
 .drop{border:2px dashed var(--goldline);border-radius:12px;padding:22px;text-align:center;background:#FFFFFF;cursor:pointer}
 .drop.on{background:var(--goldsoft)}
 .drop b{font-family:var(--serif);font-size:17px}
-.drop.sm{padding:14px;text-align:left}
-.drop.sm b{font-family:var(--sans);font-size:14px;font-weight:600}
 .drop.got{border-style:solid;background:var(--goldsoft)}
+.drop .x{border:0;background:none;color:var(--soft);cursor:pointer;font-size:13px;padding:0 4px}
 .btn{background:var(--navy);color:#fff;border:0;border-radius:10px;padding:14px 22px;font:600 16px var(--sans);cursor:pointer;width:100%}
 .btn:disabled{opacity:.6;cursor:wait}
 .err{color:var(--red);font-size:14px;margin-top:10px}
@@ -77,7 +76,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--goldline);border
   <section class="card">
     <h2>2 · What you need</h2>
     <div class="grid">
-      <label class="c12">What do you need from ARC? <span class="req">*</span>
+      <label class="c4">What do you need from ARC? <span class="req">*</span>
         <select name="service" required><option value="">Choose…</option>
           <option>Under Agreement – Contract to Close</option>
           <option>Listing – Full Listing Setup</option>
@@ -89,7 +88,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--goldline);border
         <select name="clientSide" required><option value="">Choose…</option><option>Buyer</option><option>Seller</option><option>Both</option></select></label>
       <label class="c4" data-once>Transaction platform <span class="req">*</span>
         <select name="platform" required><option value="">Choose…</option><option>Dotloop</option><option>SkySlope</option><option>Lone Wolf / Transact</option><option>Other</option></select></label>
-      <label class="c12" data-loop>Have you added lynne.pinette@verani.com to the loop? <span class="req">*</span>
+      <label class="c4" data-loop>Have you added lynne.pinette@verani.com to the loop? <span class="req">*</span>
         <select name="onLoop" required><option value="">Choose…</option><option>Yes</option><option>Not yet</option></select>
         <span class="hint" style="margin:4px 0 0;font-weight:400" data-show="onLoop:Not yet">No problem, send it anyway. Please add lynne.pinette@verani.com when you can; I'll remind you.</span></label>
     </div>
@@ -201,22 +200,21 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--goldline);border
 
   <section class="card" data-for="ua">
     <h2>7 · Deposit &amp; fees</h2>
-    <p class="hint">Dates and price come straight from the executed P&amp;S, so I don't need them here.</p>
+    <p class="hint">Dates and price come straight from the executed P&amp;S, so I don't need them here. I'll check your agreement fee against what the seller is paying.</p>
     <div class="grid">
-      <label class="c6">How is the earnest money deposit being paid? <span class="req">*</span>
+      <label class="c4">How is the earnest money deposit being paid? <span class="req">*</span>
         <select name="depMethod" required><option value="">Choose…</option><option>DepositLink — Lynne to send the request</option><option>Earnnest — Lynne to send the request</option><option>Wire</option><option>Personal check — mailed to Verani</option><option>Personal check — dropped off at a Verani office</option><option>Held by the other brokerage or an attorney</option><option>Not sure yet</option></select></label>
-      <label class="c6" data-show="depMethod:dropped off">Which office? <span class="req">*</span><select name="depOffice" required><option value="">Choose…</option><option>Portsmouth</option><option>Exeter</option><option>Biddeford</option><option>Andover</option><option>Haverhill</option><option>Methuen</option><option>Other Verani office</option></select></label>
-      <label class="c6" data-show="depOffice:Other">Which Verani office? <span class="req">*</span><input name="depOfficeOther" required placeholder="e.g. Londonderry"></label>
-      <label class="c6" data-show="clientSide:Buyer|Both">Buyer agency agreement fee <span class="req">*</span>
-        <div class="fee"><input name="buaAmt" inputmode="decimal" placeholder="e.g. 3" required><select name="buaUnit"><option>%</option><option>$</option></select></div>
-        <span class="hint" style="margin:4px 0 0;font-weight:400">From your buyer agreement — I'll check it against what the seller is paying in the P&amp;S.</span></label>
-      <label class="c6" data-show="clientSide:Buyer|Both">If the seller pays less than your agreement fee, will you waive the difference? <span class="req">*</span>
+      <label class="c4" data-show="depMethod:dropped off">Which office? <span class="req">*</span><select name="depOffice" required><option value="">Choose…</option><option>Portsmouth</option><option>Exeter</option><option>Biddeford</option><option>Andover</option><option>Haverhill</option><option>Methuen</option><option>Other Verani office</option></select></label>
+      <label class="c4" data-show="depOffice:Other">Which Verani office? <span class="req">*</span><input name="depOfficeOther" required placeholder="e.g. Londonderry"></label>
+      <label class="c4" data-show="clientSide:Buyer|Both">Buyer agency agreement fee <span class="req">*</span>
+        <div class="fee"><input name="buaAmt" inputmode="decimal" placeholder="e.g. 3" required><select name="buaUnit"><option>%</option><option>$</option></select></div></label>
+      <label class="c4" data-show="clientSide:Buyer|Both">If the seller pays less than your agreement fee, will you waive the difference? <span class="req">*</span>
         <select name="waive" required><option value="">Choose…</option><option>No — buyer pays the difference</option><option>Yes — waiving the difference</option><option>Partly — see note</option><option>Not applicable — seller covers it all</option></select></label>
-      <label class="c6" data-show="clientSide:Seller|Both">Buyer agent compensation in your listing agreement <span class="req">*</span>
+      <label class="c4" data-show="clientSide:Seller|Both">Buyer agent compensation in your listing agreement <span class="req">*</span>
         <div class="fee"><input name="lbaAmt" inputmode="decimal" placeholder="e.g. 2" required><select name="lbaUnit"><option>%</option><option>$</option></select></div></label>
-      <label class="c6" data-show="clientSide:Seller|Both">If the buyer's agent asked for more than that in the Listing Agreement, who covers the difference? <span class="req">*</span>
+      <label class="c4" data-show="clientSide:Seller|Both">If the buyer's agent asked for more than that in the Listing Agreement, who covers the difference? <span class="req">*</span>
         <select name="cover" required><option value="">Choose…</option><option>Not applicable — same or less</option><option>Listing firm is reducing its fee to cover it</option><option>Seller agreed to pay more — listing fee unchanged</option><option>Not sure yet</option></select></label>
-      <label class="c6" data-show="waive:Partly">Amount you're waiving<div class="fee"><input name="waiveAmt" inputmode="decimal"><select name="waiveUnit"><option>%</option><option>$</option></select></div></label>
+      <label class="c4" data-show="waive:Partly">Amount you're waiving<div class="fee"><input name="waiveAmt" inputmode="decimal"><select name="waiveUnit"><option>%</option><option>$</option></select></div></label>
     </div>
   </section>
 
@@ -226,10 +224,6 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--goldline);border
       <b id="dropTitle">Add the executed P&amp;S</b>
       <div class="hint" id="dropMsg" style="margin:4px 0 0">Drop the PDF here or tap to choose · up to 15 MB</div>
       <input type="file" id="pns" accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx" multiple hidden>
-    </div>
-    <div class="grid" id="agreements" style="margin-top:14px">
-      <div class="c6 drop sm" id="agListingBox" tabindex="0" role="button" aria-label="Add your signed listing agreement"><b>Your signed listing agreement <span class="req">*</span></b><div class="hint" id="agListingMsg" style="margin:4px 0 0">Drop it here or tap to choose</div><input type="file" id="agListing" accept="application/pdf,image/*,.doc,.docx" hidden></div>
-      <div class="c6 drop sm" id="agBuyerBox" tabindex="0" role="button" aria-label="Add your signed buyer agency agreement"><b>Your signed buyer agency agreement <span class="req">*</span></b><div class="hint" id="agBuyerMsg" style="margin:4px 0 0">Drop it here or tap to choose · I check your fee against it</div><input type="file" id="agBuyer" accept="application/pdf,image/*,.doc,.docx" hidden></div>
     </div>
   </section>
 
@@ -258,7 +252,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--goldline);border
 const API = window.ARC_API_URL;   // set once in config.js
 
 const form = document.getElementById('f');
-let contract = null, extras = [];
+let docs = [], extras = [], NEED = [];
 
 async function call(action, payload) {
   const res = await fetch(API, { method: 'POST', body: JSON.stringify(Object.assign({ action }, payload)) });
@@ -277,6 +271,21 @@ function onceQuestions(a) {
   document.querySelectorAll('[data-once]').forEach(el => { el.hidden = !!(a.platform || a.known); });   // returning clients aren't asked again
   document.querySelectorAll('[data-loop]').forEach(el => { el.hidden = !!QS.get('listing'); });
 }
+// Title / attorneys, lenders and agents ARC already has: pick a name and the rest fills itself in
+async function knownContacts() {
+  let list = [];
+  try { list = await call('agentContacts', { token: TOKEN }); } catch (e) { return; }
+  [['co', 'Agent', 'coBrok'], ['len', 'Lender', 'lenCo'], ['tit', 'Title / attorney', 'titCo']].forEach(([p, type, coField]) => {
+    const mine = list.filter(c => c.type === type), dl = document.createElement('datalist');
+    dl.id = p + 'List'; mine.forEach(c => { const o = document.createElement('option'); o.value = c.name; o.label = c.company || ''; dl.appendChild(o); });
+    document.body.appendChild(dl);
+    const nameIn = form[p + 'Name']; nameIn.setAttribute('list', dl.id); nameIn.autocomplete = 'off';
+    nameIn.addEventListener('change', () => {
+      const c = mine.find(x => x.name.toLowerCase() === nameIn.value.trim().toLowerCase()); if (!c) return;
+      [[coField, c.company], [p + 'Email', c.email], [p + 'Phone', c.phone]].forEach(([k, v]) => { if (v && !form[k].value.trim()) form[k].value = v; });
+    });
+  });
+}
 async function startPortal() {
   if (!PORTAL) return;
   if (!TOKEN) { location.href = 'agent.html'; return; }
@@ -287,6 +296,7 @@ async function startPortal() {
     const missing = !me.name || !me.phone || !me.company;
     document.getElementById('youCard').hidden = !missing;
     onceQuestions(me);
+    knownContacts();
     const bar = document.getElementById('portalBar');
     const lid = QS.get('listing');
     bar.innerHTML = 'Signed in as <b>' + (me.name || me.email).replace(/[<>&]/g, '') + '</b> · <a href="agent.html">Back to My files</a>';
@@ -347,16 +357,14 @@ function showSections() {
     const [name, want] = el.dataset.show.split(':');
     el.hidden = !(form[name].value && new RegExp(want).test(form[name].value));
   });
-  // New under-agreement file: I need the agent's own agreement(s). Not for a listing ARC already has.
-  const ua = !listing && !existing, cs = form.clientSide.value;
-  document.getElementById('agListingBox').hidden = !(ua && /Seller|Both/.test(cs) && form.rep.value !== 'Transaction Facilitator');
-  document.getElementById('agBuyerBox').hidden = !(ua && /Buyer|Both/.test(cs) && form.rep.value !== 'Transaction Facilitator');
+  // New under-agreement file: I need the agent's own agreement(s) too. Not for a listing ARC already has.
+  NEED = needAgreements();
   if (form.depOffice.closest('label').hidden) form.depOfficeOther.closest('label').hidden = true;
   document.querySelectorAll('[data-listing-only]').forEach(el => { el.hidden = !listing; });   // under agreement: price comes from the P&S
   let n = 0;
   form.querySelectorAll('section.card').forEach(s => { if (!s.hidden) { n++; const h = s.querySelector('h2'); h.textContent = h.textContent.replace(/^\d+/, n); } });
-  document.getElementById('dropTitle').textContent = listing ? 'Add any documents (optional)' : 'Add the executed P&S';
-  document.getElementById('dropMsg').textContent = listing ? (extras.length ? '✓ ' + extras.map(x => x.name).join(', ') : 'Disclosures, tax card, plans, photos… drop them here or tap to choose · up to 25 MB in total') : (contract ? '✓ ' + contract.name + ' attached' : 'Drop the PDF here or tap to choose · up to 15 MB');
+  document.getElementById('dropTitle').textContent = listing ? 'Add any documents (optional)' : 'Add the executed P&S' + NEED.map(a => ' and your signed ' + a[1]).join('');
+  showDocs();
 }
 form.addEventListener('change', showSections);
 showSections();
@@ -370,34 +378,39 @@ drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add(
 drop.addEventListener('dragleave', () => drop.classList.remove('on'));
 drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('on'); takeFiles(e.dataTransfer.files); });
 pns.addEventListener('change', () => { takeFiles(pns.files); pns.value = ''; });
-// The agent's own agreement(s): each box takes a dropped file or a chosen one
-const agreeFile = {};
-['agListing', 'agBuyer'].forEach(id => {
-  const box = document.getElementById(id + 'Box'), inp = document.getElementById(id), msg = document.getElementById(id + 'Msg');
-  const take = list => { const f = (list || [])[0]; if (!f) return; agreeFile[id] = f; box.classList.add('got'); box.style.borderColor = ''; msg.textContent = '✓ ' + f.name + ' attached'; };
-  box.addEventListener('click', () => inp.click());
-  box.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inp.click(); } });
-  box.addEventListener('dragover', e => { e.preventDefault(); box.classList.add('on'); });
-  box.addEventListener('dragleave', () => box.classList.remove('on'));
-  box.addEventListener('drop', e => { e.preventDefault(); box.classList.remove('on'); take(e.dataTransfer.files); });
-  inp.addEventListener('change', () => { take(inp.files); inp.value = ''; });
-});
 // A file dropped beside a box shouldn't open in the browser and lose the form
 window.addEventListener('dragover', e => e.preventDefault());
 window.addEventListener('drop', e => e.preventDefault());
-// Listing: any number of documents, filed as agent uploads. Under agreement: the executed P&S.
+// Listing: any number of documents, filed as agent uploads. Under agreement: the executed P&S and the agent's own
+// agreement, together in this one box. I read them and work out which is which.
 function takeFiles(list) {
   list = Array.from(list || []); if (!list.length) return;
-  if (!/Listing/.test(form.service.value)) return takeFile(list[0]);
+  if (!/Listing/.test(form.service.value)) { list.forEach(takeDoc); return; }
   const total = extras.reduce((a, x) => a + x.size, 0) + list.reduce((a, f) => a + f.size, 0);
   if (total > 25 * 1048576) { dropMsg.textContent = 'That is over 25 MB in total — please email the larger files to file@arkroyalclosings.com.'; return; }
   list.forEach(file => { const r = new FileReader(); r.onload = () => { extras.push({ name: file.name, mime: file.type || 'application/octet-stream', b64: String(r.result).split(',')[1], size: file.size }); dropMsg.textContent = '✓ ' + extras.map(x => x.name).join(', '); }; r.readAsDataURL(file); });
 }
-function takeFile(file) {
-  if (file.size > 15 * 1048576) { dropMsg.textContent = 'That file is over 15 MB — please email it to file@arkroyalclosings.com instead.'; return; }
+function takeDoc(file) {
+  if (file.size > 15 * 1048576) { dropMsg.textContent = file.name + ' is over 15 MB — please email it to file@arkroyalclosings.com instead.'; return; }
+  if (docs.some(x => x.name === file.name) || docs.length >= 4) return;
   const r = new FileReader();
-  r.onload = () => { contract = { name: file.name, mime: file.type || 'application/pdf', b64: String(r.result).split(',')[1] }; dropMsg.textContent = '✓ ' + file.name + ' attached'; };
+  r.onload = () => { docs.push({ name: file.name, mime: file.type || 'application/pdf', b64: String(r.result).split(',')[1] }); showDocs(); };
   r.readAsDataURL(file);
+}
+function needAgreements() {
+  const listing = /Listing/.test(form.service.value), cs = form.clientSide.value;
+  if (listing || form.existingId.value || form.rep.value === 'Transaction Facilitator') return [];
+  return [/Buyer|Both/.test(cs) && ['buyer', 'buyer agency agreement'], /Seller|Both/.test(cs) && ['listing', 'listing agreement']].filter(Boolean);
+}
+function showDocs() {
+  const drop = document.getElementById('drop'), dropMsg = document.getElementById('dropMsg');
+  if (/Listing/.test(form.service.value)) { dropMsg.textContent = extras.length ? '✓ ' + extras.map(x => x.name).join(', ') : 'Disclosures, tax card, plans, photos… drop them here or tap to choose · up to 25 MB in total'; return; }
+  drop.classList.toggle('got', docs.length > 0);
+  if (!docs.length) { dropMsg.textContent = NEED.length ? 'Drop ' + (NEED.length + 1) + ' PDFs here together, or tap to choose. I\'ll work out which is which.' : 'Drop the PDF here or tap to choose · up to 15 MB'; return; }
+  dropMsg.innerHTML = '';
+  docs.forEach((x, i) => { const row = document.createElement('div'); row.textContent = '✓ ' + x.name + ' '; const b = document.createElement('button'); b.type = 'button'; b.className = 'x'; b.textContent = 'remove';
+    b.onclick = e => { e.stopPropagation(); docs.splice(i, 1); showDocs(); }; row.appendChild(b); dropMsg.appendChild(row); });
+  if (docs.length < NEED.length + 1) { const more = document.createElement('div'); more.textContent = 'Add your signed ' + NEED.map(a => a[1]).join(' and ') + ' too, if it isn\'t one of these.'; dropMsg.appendChild(more); }
 }
 
 // Submit
@@ -406,13 +419,7 @@ form.addEventListener('submit', async e => {
   const err = document.getElementById('err'); err.hidden = true;
   const bad = Array.from(form.querySelectorAll('[required]')).filter(el => !el.closest('[hidden]')).filter(el => !el.value.trim() || (el.type === 'email' && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(el.value.trim())));
   if (bad.length) { err.textContent = 'Please complete the highlighted fields.'; err.hidden = false; bad.forEach(el => el.style.borderColor = '#8B3A3A'); bad[0].focus(); return; }
-  const agreeIn = [['listing', 'agListing', 'listing agreement'], ['buyer', 'agBuyer', 'buyer agency agreement']].filter(([, id]) => !document.getElementById(id + 'Box').hidden);
-  const missing = agreeIn.filter(([, id]) => !agreeFile[id]);
-  if (missing.length) { err.textContent = 'Please add your signed ' + missing.map(m => m[2]).join(' and ') + ' (drop it in its box under Documents).'; err.hidden = false; missing.forEach(m => document.getElementById(m[1] + 'Box').style.borderColor = '#8B3A3A'); document.getElementById(missing[0][1] + 'Box').focus(); return; }
-  const readFile = file => new Promise((ok, no) => { if (file.size > 15 * 1048576) return no(new Error(file.name + ' is over 15 MB')); const r = new FileReader(); r.onload = () => ok({ name: file.name, mime: file.type || 'application/pdf', b64: String(r.result).split(',')[1] }); r.onerror = () => no(new Error('Could not read ' + file.name)); r.readAsDataURL(file); });
-  let agreements = [];
-  try { agreements = await Promise.all(agreeIn.map(async ([kind, id]) => Object.assign({ kind }, await readFile(agreeFile[id])))); }
-  catch (x) { err.textContent = x.message; err.hidden = false; return; }
+  if (NEED.length && !docs.length) { err.textContent = 'Please add your signed ' + NEED.map(a => a[1]).join(' and ') + ' under Documents (and the executed P&S if you have it).'; err.hidden = false; drop.style.borderColor = '#8B3A3A'; drop.focus(); return; }
   const data = {}; new FormData(form).forEach((v, k) => { if (typeof v === 'string') data[k] = v.trim(); });
   if (data.depOffice === 'Other Verani office' && data.depOfficeOther) data.depOffice = data.depOfficeOther;
   delete data.depOfficeOther;
@@ -420,11 +427,12 @@ form.addEventListener('submit', async e => {
   form.querySelectorAll('[hidden] [name]').forEach(el => { delete data[el.name]; });
   form.querySelectorAll('[name][hidden]').forEach(el => { delete data[el.name]; });
   const btn = document.getElementById('go'); btn.disabled = true;
-  btn.innerHTML = '<span class="spin"></span>' + (contract ? 'Sending your document…' : 'Sending…');
+  const ua = !/Listing/.test(data.service);
+  btn.innerHTML = '<span class="spin"></span>' + (ua && docs.length ? 'Sending and reading your documents… this can take a minute' : 'Sending…');
   try {
-    const r = await call(PORTAL ? 'agentIntake' : 'intake', { token: TOKEN, form: data, contract: /Listing/.test(data.service) ? null : contract, agreements, extras: /Listing/.test(data.service) ? extras.map(x => ({ name: x.name, mime: x.mime, b64: x.b64 })) : [] });
+    const r = await call(PORTAL ? 'agentIntake' : 'intake', { token: TOKEN, form: data, docs: ua ? docs : [], extras: /Listing/.test(data.service) ? extras.map(x => ({ name: x.name, mime: x.mime, b64: x.b64 })) : [] });
     form.hidden = true;
-    document.getElementById('doneMsg').textContent = 'Your file number is ' + r.id + '. I\'ll be in touch shortly' + (r.existing ? ' — the P&S has been added to your listing file.' : '') + (contract ? ' Your document is already with me.' : (/Listing/.test(data.service) ? (extras.length ? ' — your documents are filed.' : '.') : '. Please email the executed P&S to file@arkroyalclosings.com when you have it.'));
+    document.getElementById('doneMsg').textContent = 'Your file number is ' + r.id + '. I\'ll be in touch shortly' + (r.existing ? ' — the P&S has been added to your listing file.' : '') + (!ua ? (extras.length ? ' — your documents are filed.' : '.') : docs.length ? '. Your documents are already with me.' : '. Please email the executed P&S to file@arkroyalclosings.com when you have it.');
     document.getElementById('done').hidden = false; window.scrollTo(0, 0);
   } catch (x) {
     err.textContent = 'Sorry — that didn\'t go through (' + x.message + '). Please try again, or email lynne@arkroyalclosings.com.';
