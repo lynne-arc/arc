@@ -77,6 +77,7 @@ a{color:var(--navy2)}
 .sumlines b{color:var(--ink);font-weight:500}
 .cfile{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:10px;padding:9px 11px;background:var(--wash);margin:8px 0 4px}
 .cfile .n{font-size:13px;overflow-wrap:anywhere} .cfile .m{font-size:11px;color:var(--faint)}
+.tlist{max-height:60vh;overflow-y:auto;margin-right:-6px;padding-right:6px}
 .todo{display:flex;gap:9px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--line2);font-size:13px;line-height:1.4}
 .todo:last-child{border:0} .todo input{margin-top:2px;accent-color:var(--navy);flex:none}
 .todo.done .tx{color:var(--faint);text-decoration:line-through}
@@ -379,7 +380,7 @@ async function showHome() {
 }
 document.addEventListener('click', e => { const o = e.target.closest('[data-open]'); if (o) openFile(o.dataset.open); });
 /* ---------- Agent teams (each member signs in to their own portal; team files show for all of them) ---------- */
-const PAGE_VERSION = 'p49';   // bump with every dashboard update, so Lynne can see if her browser has the latest page
+const PAGE_VERSION = 'p50';   // bump with every dashboard update, so Lynne can see if her browser has the latest page
 let TEAM_EDIT = null;
 function sharedNote(t) {
   const g = {}; (t.members || []).forEach(m => { const k = String(m.email || '').trim().toLowerCase(); if (k) (g[k] = g[k] || []).push(String(m.name || '').split(/\s+/)[0]); });
@@ -756,12 +757,12 @@ function renderTodo() {
   const gapRow = g => '<label class="todo flag' + (F.gapDone[g.key] ? ' done' : '') + '"><input type="checkbox" data-gap="' + g.key + '"' + (F.gapDone[g.key] ? ' checked' : '') + '><span><span class="tx">' + esc(g.text) + '</span><span class="src">FEE CHECK</span></span></label>';
   const todoRow = ([t, i]) => '<label class="todo' + (t.done ? ' done' : '') + '"><input type="checkbox" data-todo="' + i + '"' + (t.done ? ' checked' : '') + '><span><span class="tx">' + esc(t.text) + '</span>' + (t.src ? '<span class="src">' + esc(t.src.toUpperCase()) + '</span>' : '') + '</span><button class="x" data-deltodo="' + i + '" title="Remove">✕</button></label>';
   const idx = F.todos.map((t, i) => [t, i]), doneN = gaps.filter(g => F.gapDone[g.key]).length + idx.filter(([t]) => t.done).length;
-  $('#cTodo').innerHTML = '<div class="ch"><h3>To do · confirm</h3><span class="sub">' + open + ' open</span></div><div class="cb">' +
+  $('#cTodo').innerHTML = '<div class="ch"><h3>To do · confirm</h3><span class="sub">' + open + ' open</span></div><div class="cb"><div class="tlist">' +
     gaps.filter(g => !F.gapDone[g.key]).map(gapRow).join('') + idx.filter(([t]) => !t.done).map(todoRow).join('') +
     (!gaps.length && !F.todos.length ? '<div class="empty">Nothing to confirm yet. Items appear here when a contract is read or an agent sends the File Input page.</div>' : '') +
     (doneN && !open ? '<div class="empty">All done.</div>' : '') +
     (SHOW_DONE.todo ? gaps.filter(g => F.gapDone[g.key]).map(gapRow).join('') + idx.filter(([t]) => t.done).map(todoRow).join('') : '') +
-    doneToggle('todo', doneN, 'done') +
+    '</div>' + doneToggle('todo', doneN, 'done') +
     '<div class="btns" style="margin-top:8px"><input class="i" id="newTodo" placeholder="Add a to-do" style="flex:1"><button class="btn" id="addTodo">Add</button></div></div>';
   $('#addTodo').onclick = () => { const v = $('#newTodo').value.trim(); if (!v) return; F.todos.push({ text: v, done: false, src: '' }); renderTodo(); changed(); };
 }
@@ -921,7 +922,7 @@ function renderDocs() {
    base    → everyone: what the contract commits the seller to pay the buyer's brokerage
    buyer   → buyer, title, lender (never the listing agent or seller): the buyer owes the difference under their buyer agreement
    listing → seller, title (never the buyer's agent, buyer or lender): the listing firm is reducing its fee to cover a higher co-broke */
-const FEE_AUDIENCE = { all: ['base'], agents: ['base'], buyerClient: ['base', 'buyer'], sellerClient: ['base', 'listing'], title: ['base', 'buyer', 'listing'], lender: ['base', 'buyer'] };
+const FEE_AUDIENCE = { all: ['base'], agents: ['base'], buyerClient: [], sellerClient: [], title: [], lender: [] };   // fees only go to the agents, never clients, title or lender
 function feeNotes() {
   const ct = F.contractTerms || {}, s = ct.buyerFee, out = {};
   const show = (u, v) => feeUnit(u) === '$' ? money(v) : String(v).replace(/%$/, '') + '%';
