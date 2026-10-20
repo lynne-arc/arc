@@ -134,7 +134,7 @@ textarea.i{resize:vertical;line-height:1.55}
 .star.on{background:var(--goldsoft);border-color:var(--goldline);color:var(--amber);font-weight:600}
 
 /* docs, log, checklist */
-.doc{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--line2);font-size:13px;align-items:center}.doc>a{flex:1;min-width:0}
+.doc{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--line2);font-size:13px;align-items:center}.doc>a{flex:1;min-width:0}.doc .chip{flex:none;white-space:nowrap}
 .doc:last-child{border:0} .doc a{text-decoration:none;overflow-wrap:anywhere}
 .log{padding:9px 0;border-bottom:1px solid var(--line2);font-size:13px}
 .log:last-child{border:0}
@@ -383,7 +383,7 @@ async function showHome() {
 }
 document.addEventListener('click', e => { const o = e.target.closest('[data-open]'); if (o) openFile(o.dataset.open); });
 /* ---------- Agent teams (each member signs in to their own portal; team files show for all of them) ---------- */
-const PAGE_VERSION = 'p54';   // bump with every dashboard update, so Lynne can see if her browser has the latest page
+const PAGE_VERSION = 'p55';   // bump with every dashboard update, so Lynne can see if her browser has the latest page
 let TEAM_EDIT = null;
 function sharedNote(t) {
   const g = {}; (t.members || []).forEach(m => { const k = String(m.email || '').trim().toLowerCase(); if (k) (g[k] = g[k] || []).push(String(m.name || '').split(/\s+/)[0]); });
@@ -925,7 +925,7 @@ function renderParties() {
   $('#addParty').onclick = () => { F.parties = F.parties || []; F.parties.push({ role: $('#newRole').value, name: '', email: '', phone: '', company: '', reminders: true }); renderParties(); changed(); };
 }
 
-const DOC_ROLES = { pns: 'Executed P&S', listing: 'Listing agreement', buyer: 'Buyer agency agreement', addendum: 'Addendum / change of terms' };
+const DOC_ROLES = { pns: 'Executed P&S', listing: 'Listing agreement', buyer: 'Buyer agreement', addendum: 'Addendum' };
 function docRole(id) { return id === F.contractFileId ? 'pns' : id === F.listingDocId ? 'listing' : id === F.buyerAgreementDocId ? 'buyer' : (F.addenda || []).some(a => a.docId === id && a.status !== 'dismissed') ? 'addendum' : ''; }
 function renderDocs() {
   $('#cDocs').innerHTML = '<div class="ch"><h3>Documents</h3><span class="sub">Drive › Transactions › ' + esc(fileName()) + '</span></div><div class="cb">' +
@@ -933,8 +933,8 @@ function renderDocs() {
     (DOCS.length ? DOCS.map(d => { const role = docRole(d.id);
       return '<div class="doc"><a href="#" data-view="' + esc(d.id) + '">' + esc(d.name) + '</a>' +
         (role ? '<span class="chip gold">' + esc(DOC_ROLES[role]) + '</span>' : '') + '<span class="chip">' + esc(d.group) + '</span>' +
-        '<select class="i docrole" data-docrole="' + esc(d.id) + '" title="Tell ARC what this document is" style="width:auto;padding:3px 6px;font-size:12px"><option value="">Use as…</option>' +
-        Object.keys(DOC_ROLES).map(k => '<option value="' + k + '">' + (k === role ? 'Read again as ' + esc(DOC_ROLES[k]) : esc(DOC_ROLES[k])) + '</option>').join('') + (role && role !== 'addendum' ? '<option value="none">Not this</option>' : '') + '</select></div>'; }).join('') : '<div class="empty">No documents yet.</div>') +
+        '<select class="i docrole" data-docrole="' + esc(d.id) + '" title="Tell ARC what this document is" style="width:92px;flex:none;padding:3px 6px;font-size:12px"><option value="">Use as…</option>' +
+        Object.keys(DOC_ROLES).map(k => '<option value="' + k + '">' + (k === role ? 'Read again' : esc(DOC_ROLES[k])) + '</option>').join('') + (role && role !== 'addendum' ? '<option value="none">Not this</option>' : '') + '</select></div>'; }).join('') : '<div class="empty">No documents yet.</div>') +
     '<label class="docdrop" id="docDrop" title="Each document is read and sorted: P&amp;S, buyer agency or listing agreement, addendum, or just saved"><b>Drop documents to read &amp; sort</b><span class="small faint" id="dropMsg">Addenda, listing or buyer agency agreements, several at once. Or click to choose.</span><input type="file" id="sortIn" hidden multiple></label>' +
     '<div class="btns" style="margin-top:10px"><span class="small faint">Just save, no reading:</span><select class="i" id="docGroup" style="width:auto">' + opt(DOC_GROUPS, 'ARC internal') + '</select>' +
     '<label class="btn">Upload<input type="file" id="docIn" hidden multiple></label><span class="small faint" id="docMsg"></span></div></div>';
