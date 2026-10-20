@@ -380,7 +380,7 @@ async function showHome() {
 }
 document.addEventListener('click', e => { const o = e.target.closest('[data-open]'); if (o) openFile(o.dataset.open); });
 /* ---------- Agent teams (each member signs in to their own portal; team files show for all of them) ---------- */
-const PAGE_VERSION = 'p51';   // bump with every dashboard update, so Lynne can see if her browser has the latest page
+const PAGE_VERSION = 'p52';   // bump with every dashboard update, so Lynne can see if her browser has the latest page
 let TEAM_EDIT = null;
 function sharedNote(t) {
   const g = {}; (t.members || []).forEach(m => { const k = String(m.email || '').trim().toLowerCase(); if (k) (g[k] = g[k] || []).push(String(m.name || '').split(/\s+/)[0]); });
@@ -460,7 +460,7 @@ function setFile(file, docs) {
 function applyServerFile(r) {
   F = r.file; DOCS = r.docs || DOCS; E = {}; dirty = false;
   const i = S.files.findIndex(x => x.id === F.id);
-  const sum = { id: F.id, address: (F.property || {}).address, town: (F.property || {}).town, status: F.status, closing: F.dates.closing, pending: !!(F.reading && !F.confirmed) };
+  const sum = { id: F.id, address: (F.property || {}).address, town: (F.property || {}).town, status: F.status, closing: F.dates.closing, pending: !!((F.reading && !F.confirmed) || (F.addenda || []).some(a => a.status === 'new')) };
   if (i > -1) S.files[i] = Object.assign(S.files[i], sum); else S.files.push(sum);
   fillSelect(); renderFile();
 }
@@ -507,9 +507,39 @@ function renderPending() {
     '<button class="btn primary" id="confirmBtn">Confirm</button></div>'
     : (F.readError && (!r || F.readError.at > r.at)) ? '<div class="banner" style="margin-bottom:16px;background:#F8E6E4;border-color:#E2B8B3"><div><b>The contract couldn\'t be read</b><div class="small" style="color:#8B3A3A">' + esc(F.readError.message) + ' (' + esc(new Date(F.readError.at).toLocaleString('en-US', {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'})) + ')</div></div><button class="btn" id="retryRead">Read again</button></div>'
     : F.pending ? '<div class="banner" style="margin-bottom:16px"><div><b>This contract was read with an older version</b><div class="small muted">Press Read again to fill in the file.</div></div></div>' : '';
+  $('#pendBanner').innerHTML = addendaBanners() + $('#pendBanner').innerHTML;
+  wireAddenda();
   const rr = $('#retryRead'); if (rr) rr.onclick = () => $('#rereadBtn') && $('#rereadBtn').click();
   const b = $('#confirmBtn');
   if (b) b.onclick = confirmReading;
+}
+/* ---------- Addenda: read for what they change; nothing moves until Lynne presses Apply changes ---------- */
+function changeText(c) {
+  const v = c.key === 'waive' ? '' : /^\d{4}-\d{2}-\d{2}$/.test(c.to || '') ? fmtShort(c.to) : (c.key === 'price' || c.key === 'depositAmount') && c.to ? money(c.to) : '';
+  const was = /^\d{4}-\d{2}-\d{2}$/.test(c.was || '') ? fmtShort(c.was) : c.was ? money(c.was) : c.from || '';
+  return '<span style="font-weight:600">' + esc(c.label) + '</span>' + (v ? ': ' + (was ? esc(was) + ' → ' : '') + esc(v) : '') + (c.deadline ? ', by ' + esc(fmtShort(c.deadline)) : '') + (c.text && (!v || c.key === 'other') ? '<div class="small muted">' + esc(c.text) + '</div>' : '');
+}
+function addendaBanners() {
+  return (F.addenda || []).filter(a => a.status === 'new').map(a =>
+    '<div class="banner" style="margin-bottom:16px;background:#FFF6D6;border-color:#E8D28E;align-items:flex-start"><div style="flex:1;min-width:240px">' +
+      '<b>' + esc(a.title) + ' to check' + '</b><div class="small muted">Uploaded' + (a.by ? ' by ' + esc(a.by) : '') + ' ' + esc(new Date(a.at).toLocaleString('en-US', {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'})) +
+      (a.signedDate ? ' · signed ' + esc(fmtShort(a.signedDate)) : '') + '. Untick anything that\'s wrong, then press Apply changes. Nothing on the file changes until you do.</div>' +
+      (a.changes.length ? '<div style="margin-top:8px">' + a.changes.map((c, i) => '<label style="display:flex;gap:8px;align-items:flex-start;margin:4px 0"><input type="checkbox" checked data-addchg="' + esc(a.id) + '" value="' + i + '" style="margin-top:4px"><span>' + changeText(c) + '</span></label>').join('') + '</div>'
+        : '<div class="small" style="margin-top:8px">No changes were found in it. Open it and check it yourself.</div>') +
+      (a.missing.length ? '<div class="small" style="margin-top:8px;color:#8B3A3A"><span style="font-weight:600">Missing:</span> ' + a.missing.map(esc).join('; ') + '</div>' : '') +
+    '</div><div class="btns"><button class="btn" data-view="' + esc(a.docId) + '">View</button><button class="btn primary" data-addapply="' + esc(a.id) + '">Apply changes</button><button class="btn ghost" data-adddismiss="' + esc(a.id) + '">Not needed</button></div></div>').join('');
+}
+function wireAddenda() {
+  const go = async (b, apply) => {
+    const id = b.dataset.addapply || b.dataset.adddismiss;
+    const skip = Array.from(document.querySelectorAll('[data-addchg="' + id + '"]')).filter(x => !x.checked).map(x => Number(x.value));
+    b.disabled = true; b.innerHTML = '<span class="spin"></span>';
+    try { await flush(); const r = await call('addendumApply', { id: F.id, addId: id, apply, skip }); setFile(r.file, r.docs);
+      toast(apply ? 'Addendum applied. Dates and to-dos are updated.' : 'Left the file as it was.'); }
+    catch (err) { toast(err.message, true); b.disabled = false; b.textContent = apply ? 'Apply changes' : 'Not needed'; }
+  };
+  document.querySelectorAll('[data-addapply]').forEach(b => b.onclick = () => go(b, true));
+  document.querySelectorAll('[data-adddismiss]').forEach(b => b.onclick = () => go(b, false));
 }
 function confirmReading() { F.confirmed = new Date().toISOString(); tick('Contract dates confirmed'); renderFile(); changed(); toast('Confirmed. Reminders are on for this file.'); }
 
@@ -556,7 +586,7 @@ function renderSummary() {
   // short form, e.g. "Add 1 · Extn from 9/18"
   const shortBasis = b => { if (/^(Add|Amd|Ctr)\s*\d/i.test(String(b))) return String(b).slice(0, 60); b = String(b || '').split(/[.;]\s/)[0].replace(/\baddendum\s*#?/i, 'Add ').replace(/\bamendment\s*#?/i, 'Amd ').replace(/\bcounter-?\s?offer\s*#?/i, 'Ctr ')
       .replace(/\bextended\b|\bextension\b/i, 'Extn').replace(/\bchanged\b/i, 'Chg').replace(/\s*:\s*/, ' · ').replace(/\s+/g, ' ').trim(); return b.length > 40 ? b.slice(0, 40) + '…' : b; };
-  const addNote = k => { const b = String(basis[k] || ''); return k && /addend|amend|counter/i.test(b) ? '<div style="font-size:12px;color:var(--amber,#9A6B00)">' + esc(shortBasis(b)) + '</div>' : ''; };
+  const addNote = k => { const b = String(basis[k] || ''); return k && /addend|amend|counter|^(Add|Amd|Ctr)\s*\d/i.test(b) ? '<div style="font-size:12px;color:var(--amber,#9A6B00)">' + esc(shortBasis(b)) + '</div>' : ''; };
   const rows = items.map(x => '<tr' + (ua && afterClosing(x.date, x.k) ? ' style="color:var(--red)" title="This date is after closing"' : '') + '><td>' + esc(x.label) + (ua && afterClosing(x.date, x.k) ? ' <b class="small">· after closing</b>' : '') + addNote(x.k) + (x.k === 'deposit' && depShort() ? '<div style="font-size:12px;color:var(--soft)">' + esc(depShort()) + '</div>' : '') + '</td><td>' + (x.k === 'deposit' && F.depositAmount ? esc(money(F.depositAmount)) + ', ' : '') + (x.k === 'closing' ? 'On or before ' : '') + esc(fmtShort(x.date)) + '</td></tr>').join('');
   $('#cDeal').innerHTML =
     '<div class="ch"><h2 class="title">' + esc(p.address || 'New file') + (p.town ? ', ' + esc(p.town) : '') + (p.state ? ', ' + esc(p.state) : '') + '</h2><span class="chip navy">' + esc(F.id) + '</span></div><div class="cb">' +
@@ -890,8 +920,8 @@ function renderParties() {
   $('#addParty').onclick = () => { F.parties = F.parties || []; F.parties.push({ role: $('#newRole').value, name: '', email: '', phone: '', company: '', reminders: true }); renderParties(); changed(); };
 }
 
-const DOC_ROLES = { pns: 'Executed P&S', listing: 'Listing agreement', buyer: 'Buyer agency agreement' };
-function docRole(id) { return id === F.contractFileId ? 'pns' : id === F.listingDocId ? 'listing' : id === F.buyerAgreementDocId ? 'buyer' : ''; }
+const DOC_ROLES = { pns: 'Executed P&S', listing: 'Listing agreement', buyer: 'Buyer agency agreement', addendum: 'Addendum / change of terms' };
+function docRole(id) { return id === F.contractFileId ? 'pns' : id === F.listingDocId ? 'listing' : id === F.buyerAgreementDocId ? 'buyer' : (F.addenda || []).some(a => a.docId === id && a.status !== 'dismissed') ? 'addendum' : ''; }
 function renderDocs() {
   $('#cDocs').innerHTML = '<div class="ch"><h3>Documents</h3><span class="sub">Drive › Transactions › ' + esc(fileName()) + '</span></div><div class="cb">' +
     '<div class="cfile ecs" style="margin-top:0"><div><div class="n">Executed Contract Summary</div><div class="m">The Important Dates page, ready to send to anyone on the deal</div></div><button class="btn" id="ecsBtn">Download</button></div>' +
@@ -899,7 +929,7 @@ function renderDocs() {
       return '<div class="doc"><a href="#" data-view="' + esc(d.id) + '">' + esc(d.name) + '</a>' +
         (role ? '<span class="chip gold">' + esc(DOC_ROLES[role]) + '</span>' : '') + '<span class="chip">' + esc(d.group) + '</span>' +
         '<select class="i docrole" data-docrole="' + esc(d.id) + '" title="Tell ARC what this document is" style="width:auto;padding:3px 6px;font-size:12px"><option value="">Use as…</option>' +
-        Object.keys(DOC_ROLES).map(k => '<option value="' + k + '">' + (k === role ? 'Read again as ' + esc(DOC_ROLES[k]) : esc(DOC_ROLES[k])) + '</option>').join('') + (role ? '<option value="none">Not this</option>' : '') + '</select></div>'; }).join('') : '<div class="empty">No documents yet.</div>') +
+        Object.keys(DOC_ROLES).map(k => '<option value="' + k + '">' + (k === role ? 'Read again as ' + esc(DOC_ROLES[k]) : esc(DOC_ROLES[k])) + '</option>').join('') + (role && role !== 'addendum' ? '<option value="none">Not this</option>' : '') + '</select></div>'; }).join('') : '<div class="empty">No documents yet.</div>') +
     '<div class="btns" style="margin-top:10px"><select class="i" id="docGroup" style="width:auto">' + opt(DOC_GROUPS, 'ARC internal') + '</select>' +
     '<label class="btn">Upload<input type="file" id="docIn" hidden></label><span class="small faint" id="docMsg"></span></div></div>';
   $('#ecsBtn').onclick = contractSummary;
@@ -907,7 +937,7 @@ function renderDocs() {
     const role = sel.value; if (!role) return;
     if (role === 'pns' && F.contractFileId && !confirm('Read this document as the executed P&S? It replaces the dates and terms from the last reading, and you\'ll need to Confirm again.')) { sel.value = ''; return; }
     sel.disabled = true; toast(role === 'none' ? 'Saving…' : 'Reading it… about 30 seconds');
-    try { await flush(); const r = await call('setDocRole', { id: F.id, docId: sel.dataset.docrole, role }); setFile(r.file, r.docs);
+    try { await flush(); const r = await call('setDocRole', { id: F.id, docId: sel.dataset.docrole, role }); setFile(r.file, r.docs); if (role === 'addendum' && r.addendum) window.scrollTo(0, 0);
       toast(role === 'pns' ? (r.error || (r.file.readError ? r.file.readError.message : 'P&S read. Check the details and press Confirm.')) : (r.note || 'Saved'), !!(r.error || (role === 'pns' && r.file.readError) || /could not/i.test(r.note || ''))); }
     catch (err) { toast(err.message, true); sel.disabled = false; sel.value = ''; }
   });

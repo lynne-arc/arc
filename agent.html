@@ -203,7 +203,9 @@ function renderFile(f) {
         (f.parties.length ? f.parties.map(p => '<div class="person"><div class="role">' + esc(p.role) + '</div><div><b>' + esc(p.name) + '</b>' + (p.company ? ' · ' + esc(p.company) : '') + '</div>' +
           '<div class="small muted">' + [p.email ? '<a href="mailto:' + esc(p.email) + '">' + esc(p.email) + '</a>' : '', esc(p.phone)].filter(Boolean).join(' · ') + '</div></div>').join('') : '<div class="empty">No one added yet.</div>') +
       '</div></section>' +
-      '<section class="card t-green"><div class="ch"><span>Documents</span><label class="btn small">Upload<input type="file" id="up" hidden multiple></label></div><div class="cb" id="docs">' +
+      '<section class="card t-green"><div class="ch"><span>Documents</span><span style="display:flex;gap:6px;flex-wrap:wrap">' +
+        (f.hasContract ? '<label class="btn small gold" title="An addendum, amendment, extension or counteroffer: Lynne gets the changes and updates the dates">Upload an addendum<input type="file" id="upAdd" hidden accept=".pdf,image/*"></label>' : '') +
+        '<label class="btn small">Upload<input type="file" id="up" hidden multiple></label></span></div><div class="cb" id="docs">' +
         (f.docs.length ? f.docs.map(d => '<div class="doc"><span>' + esc(d.name.replace(/^\d{4}-\d{2}-\d{2} \d{4} · /, '')) + '<br><span class="small faint">' + esc(d.group) + ' · ' + esc(d.date.slice(0, 10)) + '</span></span><button class="btn small" data-dl="' + esc(d.id) + '">Download</button></div>').join('') : '<div class="empty">No documents yet.</div>') +
       '</div></section>' +
     '</div><div class="col">' +
@@ -224,6 +226,17 @@ function renderFile(f) {
         await call('agentUpload', { id: f.id, name: file.name, mime: file.type, b64 }); toast(file.name + ' uploaded'); }
       catch (err) { toast(err.message, true); }
     }
+    openFile(f.id);
+  };
+  const ua = $('#upAdd');
+  if (ua) ua.onchange = async e => {
+    const file = e.target.files[0]; e.target.value = ''; if (!file) return;
+    if (file.size > 15 * 1048576) { toast(file.name + ' is over 15 MB', true); return; }
+    const lab = ua.parentNode; lab.style.pointerEvents = 'none'; lab.firstChild.textContent = 'Sending…';
+    try { const b64 = await new Promise((ok, bad) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1]); r.onerror = bad; r.readAsDataURL(file); });
+      await call('agentUpload', { id: f.id, name: file.name, mime: file.type, b64, kind: 'addendum' });
+      toast('Addendum sent to Lynne. She\'ll check it and update the dates.'); }
+    catch (err) { toast(err.message, true); }
     openFile(f.id);
   };
   document.querySelectorAll('[data-dl]').forEach(b => b.onclick = async () => {
