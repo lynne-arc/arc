@@ -207,7 +207,7 @@ function renderFile(f) {
           '<div class="small muted">' + [p.email ? '<a href="mailto:' + esc(p.email) + '">' + esc(p.email) + '</a>' : '', esc(p.phone)].filter(Boolean).join(' · ') + '</div></div>').join('') : '<div class="empty">No one added yet.</div>') +
       '</div></section>' +
       '<section class="card t-green"><div class="ch"><span>Documents</span></div><div class="cb" id="docs">' +
-        '<label class="drop" id="drop"><b>Drop documents here</b><div class="small muted" id="dropMsg">Addenda, extensions, the listing or buyer agency agreement, or anything else for this file. Several at once is fine, or click to choose.</div><input type="file" id="up" hidden multiple></label>' +
+        '<label class="drop" id="drop"><b>Drop documents here</b><div class="small muted" id="dropMsg">Addenda, extensions, the listing or buyer agency agreement, the commission statement, or anything else for this file. Several at once is fine, or click to choose.</div><input type="file" id="up" hidden multiple></label>' +
         (f.docs.length ? f.docs.map(d => '<div class="doc"><span>' + esc(d.name.replace(/^\d{4}-\d{2}-\d{2} \d{4} · /, '')) + '<br><span class="small faint">' + esc(d.group) + ' · ' + esc(d.date.slice(0, 10)) + '</span></span><button class="btn small" data-dl="' + esc(d.id) + '">Download</button></div>').join('') : '<div class="empty">No documents yet.</div>') +
       '</div></section>' +
     '</div><div class="col">' +

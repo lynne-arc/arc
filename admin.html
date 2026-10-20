@@ -383,7 +383,7 @@ async function showHome() {
 }
 document.addEventListener('click', e => { const o = e.target.closest('[data-open]'); if (o) openFile(o.dataset.open); });
 /* ---------- Agent teams (each member signs in to their own portal; team files show for all of them) ---------- */
-const PAGE_VERSION = 'p55';   // bump with every dashboard update, so Lynne can see if her browser has the latest page
+const PAGE_VERSION = 'p56';   // bump with every dashboard update, so Lynne can see if her browser has the latest page
 let TEAM_EDIT = null;
 function sharedNote(t) {
   const g = {}; (t.members || []).forEach(m => { const k = String(m.email || '').trim().toLowerCase(); if (k) (g[k] = g[k] || []).push(String(m.name || '').split(/\s+/)[0]); });
@@ -769,7 +769,7 @@ function renderAgent() {
   let buyerSide = isBuyerSide(), sellerSide = isSellerSide();
   if (!buyerSide && !sellerSide) buyerSide = sellerSide = true;   // side not known yet: offer both
   const fees = isUA();
-  if (!groups.length && !fees) { el.hidden = true; return; }
+  if (!groups.length && !fees && !F.commissionCheck) { el.hidden = true; return; }
   el.hidden = false;
   const ff = (path, ph, w) => '<input class="i" data-path="' + path + '" value="' + esc(getPath(F, path) || '') + '" placeholder="' + ph + '" style="width:' + (w || 64) + 'px;padding:5px 7px">';
   const fs = (path, list, w) => '<select class="i" data-path="' + path + '" style="width:' + (w || 'auto') + ';padding:5px 7px">' + (/\.unit$/.test(path) ? '' : '<option value=""></option>') + opt(list, getPath(F, path) || (/\.unit$/.test(path) ? '%' : '')) + '</select>';
@@ -781,7 +781,14 @@ function renderAgent() {
     (sellerSide ? feeRow('Listing: buyer agent', ff('listingBuyerFee.amount', '2') + fs('listingBuyerFee.unit', ['%', '$']) + fs('listingBuyerFee.basis', ['gross', 'net'])) +
       feeRow('If they asked for more', fs('listingBuyerFee.cover', ['Not applicable — same or less', 'Listing firm is reducing its fee to cover it', 'Seller agreed to pay more — listing fee unchanged', 'Not sure yet'], '100%')) : '') +
     '</table>';
-  el.innerHTML = '<div class="ch"><h3>File info</h3><span class="sub">Agent answers &amp; agreements</span></div><div class="cb">' + feesHtml +
+  const cc = F.commissionCheck, ccDoc = cc && DOCS.find(x => x.id === cc.docId);
+  const commHtml = !cc ? '' : '<div class="small muted" style="margin:10px 0 2px;font-weight:600;letter-spacing:.06em;text-transform:uppercase">Commission statement check' +
+      (ccDoc ? ' · <a href="#" data-view="' + esc(ccDoc.id) + '" style="text-transform:none;letter-spacing:0">view</a>' : '') + '</div>' +
+    '<table class="dates"><tr><th></th><th style="text-align:left">Statement</th><th style="text-align:left">File / math</th></tr>' + cc.rows.map(r => '<tr' + (r.ok === false ? ' style="color:var(--red)"' : '') + '><td style="' + (r.ok === false ? 'font-weight:600' : 'color:var(--soft)') + ';padding-right:8px;white-space:nowrap">' +
+      (r.ok === false ? '✗ ' : r.ok ? '✓ ' : '') + esc(r.label) + '</td><td style="text-align:left">' + esc(r.statement) + '</td><td style="text-align:left">' + esc(r.file) + '</td></tr>').join('') + '</table>' +
+    (cc.issues.length ? '<div class="small" style="color:var(--red);margin-top:4px">' + cc.issues.map(esc).join('<br>') + '</div>' : '') +
+    '<div class="small faint" style="margin-top:4px">Checked ' + esc(new Date(cc.at).toLocaleString('en-US', {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'})) + '</div>';
+  el.innerHTML = '<div class="ch"><h3>File info</h3><span class="sub">Agent answers &amp; agreements</span></div><div class="cb">' + feesHtml + commHtml +
     groups.map(([name, rows]) => '<div class="small muted" style="margin:6px 0 2px;font-weight:600;letter-spacing:.06em;text-transform:uppercase">' + esc(name) + '</div>' +
       '<table class="dates">' + rows.map(r => '<tr><td style="color:var(--soft);width:48%;padding-right:10px">' + esc(String(r.label).replace(/^⚑ /, '')) + '</td><td style="text-align:left' + (/^⚑/.test(r.label) ? ';color:var(--red)' : '') + '">' + esc(r.value) + '</td></tr>').join('') + '</table>').join('') +
     '</div>';
@@ -925,8 +932,8 @@ function renderParties() {
   $('#addParty').onclick = () => { F.parties = F.parties || []; F.parties.push({ role: $('#newRole').value, name: '', email: '', phone: '', company: '', reminders: true }); renderParties(); changed(); };
 }
 
-const DOC_ROLES = { pns: 'Executed P&S', listing: 'Listing agreement', buyer: 'Buyer agreement', addendum: 'Addendum' };
-function docRole(id) { return id === F.contractFileId ? 'pns' : id === F.listingDocId ? 'listing' : id === F.buyerAgreementDocId ? 'buyer' : (F.addenda || []).some(a => a.docId === id && a.status !== 'dismissed') ? 'addendum' : ''; }
+const DOC_ROLES = { pns: 'Executed P&S', listing: 'Listing agreement', buyer: 'Buyer agreement', addendum: 'Addendum', commission: 'Commission' };
+function docRole(id) { return id === F.contractFileId ? 'pns' : id === F.listingDocId ? 'listing' : id === F.buyerAgreementDocId ? 'buyer' : id === F.commissionDocId ? 'commission' : (F.addenda || []).some(a => a.docId === id && a.status !== 'dismissed') ? 'addendum' : ''; }
 function renderDocs() {
   $('#cDocs').innerHTML = '<div class="ch"><h3>Documents</h3><span class="sub">Drive › Transactions › ' + esc(fileName()) + '</span></div><div class="cb">' +
     '<div class="cfile ecs" style="margin-top:0"><div><div class="n">Executed Contract Summary</div><div class="m">The Important Dates page, ready to send to anyone on the deal</div></div><button class="btn" id="ecsBtn">Download</button></div>' +
@@ -935,7 +942,7 @@ function renderDocs() {
         (role ? '<span class="chip gold">' + esc(DOC_ROLES[role]) + '</span>' : '') + '<span class="chip">' + esc(d.group) + '</span>' +
         '<select class="i docrole" data-docrole="' + esc(d.id) + '" title="Tell ARC what this document is" style="width:92px;flex:none;padding:3px 6px;font-size:12px"><option value="">Use as…</option>' +
         Object.keys(DOC_ROLES).map(k => '<option value="' + k + '">' + (k === role ? 'Read again' : esc(DOC_ROLES[k])) + '</option>').join('') + (role && role !== 'addendum' ? '<option value="none">Not this</option>' : '') + '</select></div>'; }).join('') : '<div class="empty">No documents yet.</div>') +
-    '<label class="docdrop" id="docDrop" title="Each document is read and sorted: P&amp;S, buyer agency or listing agreement, addendum, or just saved"><b>Drop documents to read &amp; sort</b><span class="small faint" id="dropMsg">Addenda, listing or buyer agency agreements, several at once. Or click to choose.</span><input type="file" id="sortIn" hidden multiple></label>' +
+    '<label class="docdrop" id="docDrop" title="Each document is read and sorted: P&amp;S, buyer agency or listing agreement, addendum, or just saved"><b>Drop documents to read &amp; sort</b><span class="small faint" id="dropMsg">Addenda, listing or buyer agency agreements, commission statements, several at once. Or click to choose.</span><input type="file" id="sortIn" hidden multiple></label>' +
     '<div class="btns" style="margin-top:10px"><span class="small faint">Just save, no reading:</span><select class="i" id="docGroup" style="width:auto">' + opt(DOC_GROUPS, 'ARC internal') + '</select>' +
     '<label class="btn">Upload<input type="file" id="docIn" hidden multiple></label><span class="small faint" id="docMsg"></span></div></div>';
   $('#ecsBtn').onclick = contractSummary;
