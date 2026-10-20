@@ -76,6 +76,9 @@ details.mail pre{white-space:pre-wrap;font:13px/1.55 var(--sans);background:var(
 .toast.err{background:var(--red)}
 .spin{display:inline-block;width:14px;height:14px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px}
 @keyframes sp{to{transform:rotate(360deg)}}
+.drop{display:block;border:2px dashed #D9C08A;border-radius:12px;padding:18px;text-align:center;cursor:pointer;margin-bottom:10px}
+.drop.on{background:var(--goldsoft)}
+.drop b{font:700 17px var(--serif);color:var(--navy)}
 .foot{text-align:center;color:var(--faint);font-size:12px;margin-top:40px;font-style:italic;font-family:var(--serif);font-size:15px}
 </style>
 </head>
@@ -203,9 +206,8 @@ function renderFile(f) {
         (f.parties.length ? f.parties.map(p => '<div class="person"><div class="role">' + esc(p.role) + '</div><div><b>' + esc(p.name) + '</b>' + (p.company ? ' · ' + esc(p.company) : '') + '</div>' +
           '<div class="small muted">' + [p.email ? '<a href="mailto:' + esc(p.email) + '">' + esc(p.email) + '</a>' : '', esc(p.phone)].filter(Boolean).join(' · ') + '</div></div>').join('') : '<div class="empty">No one added yet.</div>') +
       '</div></section>' +
-      '<section class="card t-green"><div class="ch"><span>Documents</span><span style="display:flex;gap:6px;flex-wrap:wrap">' +
-        (f.hasContract ? '<label class="btn small gold" title="An addendum, amendment, extension or counteroffer: Lynne gets the changes and updates the dates">Upload an addendum<input type="file" id="upAdd" hidden accept=".pdf,image/*"></label>' : '') +
-        '<label class="btn small">Upload<input type="file" id="up" hidden multiple></label></span></div><div class="cb" id="docs">' +
+      '<section class="card t-green"><div class="ch"><span>Documents</span></div><div class="cb" id="docs">' +
+        '<label class="drop" id="drop"><b>Drop documents here</b><div class="small muted" id="dropMsg">Addenda, extensions, the listing or buyer agency agreement, or anything else for this file. Several at once is fine, or click to choose.</div><input type="file" id="up" hidden multiple></label>' +
         (f.docs.length ? f.docs.map(d => '<div class="doc"><span>' + esc(d.name.replace(/^\d{4}-\d{2}-\d{2} \d{4} · /, '')) + '<br><span class="small faint">' + esc(d.group) + ' · ' + esc(d.date.slice(0, 10)) + '</span></span><button class="btn small" data-dl="' + esc(d.id) + '">Download</button></div>').join('') : '<div class="empty">No documents yet.</div>') +
       '</div></section>' +
     '</div><div class="col">' +
@@ -217,28 +219,30 @@ function renderFile(f) {
       '</div></section>' +
     '</div></div>';
   $('#back').onclick = e => { e.preventDefault(); loadFiles(); };
-  $('#up').onchange = async e => {
-    const list = Array.from(e.target.files); e.target.value = '';
-    for (const file of list) {
-      if (file.size > 15 * 1048576) { toast(file.name + ' is over 15 MB', true); continue; }
-      toast('Uploading ' + file.name + '…');
-      try { const b64 = await new Promise((ok, bad) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1]); r.onerror = bad; r.readAsDataURL(file); });
-        await call('agentUpload', { id: f.id, name: file.name, mime: file.type, b64 }); toast(file.name + ' uploaded'); }
+  const send = async list => {
+    list = list.filter(file => { if (file.size > 15 * 1048576) { toast(file.name + ' is over 15 MB', true); return false; } return true; });
+    if (!list.length) return;
+    const drop = $('#drop'); drop.style.pointerEvents = 'none';
+    $('#dropMsg').innerHTML = '<span class="spin"></span> Sending ' + list.length + ' document' + (list.length > 1 ? 's' : '') + ' to Lynne… this can take a minute while they\'re read.';
+    const toB64 = file => new Promise((ok, bad) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1]); r.onerror = bad; r.readAsDataURL(file); });
+    // batches of about 20 MB so each send stays small enough
+    const batches = []; let cur = [], size = 0;
+    list.forEach(file => { if (cur.length && (size + file.size > 20 * 1048576 || cur.length >= 6)) { batches.push(cur); cur = []; size = 0; } cur.push(file); size += file.size; });
+    batches.push(cur);
+    let ok = 0;
+    for (const b of batches) {
+      try { const docs = []; for (const file of b) docs.push({ name: file.name, mime: file.type, b64: await toB64(file) });
+        await call('agentDocs', { id: f.id, docs }); ok += b.length; }
       catch (err) { toast(err.message, true); }
     }
+    if (ok) toast(ok === 1 ? 'Sent to Lynne. She\'ll check it and update the file.' : ok + ' documents sent to Lynne. She\'ll check them and update the file.');
     openFile(f.id);
   };
-  const ua = $('#upAdd');
-  if (ua) ua.onchange = async e => {
-    const file = e.target.files[0]; e.target.value = ''; if (!file) return;
-    if (file.size > 15 * 1048576) { toast(file.name + ' is over 15 MB', true); return; }
-    const lab = ua.parentNode; lab.style.pointerEvents = 'none'; lab.firstChild.textContent = 'Sending…';
-    try { const b64 = await new Promise((ok, bad) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1]); r.onerror = bad; r.readAsDataURL(file); });
-      await call('agentUpload', { id: f.id, name: file.name, mime: file.type, b64, kind: 'addendum' });
-      toast('Addendum sent to Lynne. She\'ll check it and update the dates.'); }
-    catch (err) { toast(err.message, true); }
-    openFile(f.id);
-  };
+  $('#up').onchange = e => { const list = Array.from(e.target.files); e.target.value = ''; send(list); };
+  const dz = $('#drop');
+  ['dragenter', 'dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('on'); }));
+  ['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('on'); }));
+  dz.addEventListener('drop', e => send(Array.from(e.dataTransfer.files)));
   document.querySelectorAll('[data-dl]').forEach(b => b.onclick = async () => {
     b.disabled = true; b.innerHTML = '<span class="spin"></span>';
     try { const r = await call('agentDoc', { id: f.id, docId: b.dataset.dl });
@@ -248,6 +252,8 @@ function renderFile(f) {
     b.disabled = false; b.textContent = 'Download';
   });
 }
+// a file dropped outside the box must not open in the browser and lose the page
+['dragover', 'drop'].forEach(ev => window.addEventListener(ev, e => e.preventDefault()));
 start();
 </script>
 </body>
