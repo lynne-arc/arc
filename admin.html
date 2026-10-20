@@ -383,7 +383,7 @@ async function showHome() {
 }
 document.addEventListener('click', e => { const o = e.target.closest('[data-open]'); if (o) openFile(o.dataset.open); });
 /* ---------- Agent teams (each member signs in to their own portal; team files show for all of them) ---------- */
-const PAGE_VERSION = 'p56';   // bump with every dashboard update, so Lynne can see if her browser has the latest page
+const PAGE_VERSION = 'p57';   // bump with every dashboard update, so Lynne can see if her browser has the latest page
 let TEAM_EDIT = null;
 function sharedNote(t) {
   const g = {}; (t.members || []).forEach(m => { const k = String(m.email || '').trim().toLowerCase(); if (k) (g[k] = g[k] || []).push(String(m.name || '').split(/\s+/)[0]); });
@@ -530,6 +530,7 @@ function addendaBanners() {
       (a.signedDate ? ' · signed ' + esc(fmtShort(a.signedDate)) : '') + '. Untick anything that\'s wrong, then press Apply changes. Nothing on the file changes until you do.</div>' +
       (a.changes.length ? '<div style="margin-top:8px">' + a.changes.map((c, i) => '<label style="display:flex;gap:8px;align-items:flex-start;margin:4px 0"><input type="checkbox" checked data-addchg="' + esc(a.id) + '" value="' + i + '" style="margin-top:4px"><span>' + changeText(c) + '</span></label>').join('') + '</div>'
         : '<div class="small" style="margin-top:8px">No changes were found in it. Open it and check it yourself.</div>') +
+      (a.psEffective && F.dates.effective && a.psEffective !== F.dates.effective ? '<div class="small" style="margin-top:8px;color:#8B3A3A"><span style="font-weight:600">Wrong P&amp;S date:</span> it says the P&amp;S effective date is ' + esc(fmtShort(a.psEffective)) + ', the P&amp;S is ' + esc(fmtShort(F.dates.effective)) + '.</div>' : '') +
       (a.missing.length ? '<div class="small" style="margin-top:8px;color:#8B3A3A"><span style="font-weight:600">Missing:</span> ' + a.missing.map(esc).join('; ') + '</div>' : '') +
     '</div><div class="btns"><button class="btn" data-view="' + esc(a.docId) + '">View</button><button class="btn primary" data-addapply="' + esc(a.id) + '">Apply changes</button><button class="btn ghost" data-adddismiss="' + esc(a.id) + '">Not needed</button></div></div>').join('');
 }
