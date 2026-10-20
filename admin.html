@@ -83,6 +83,8 @@ a{color:var(--navy2)}
 .todo.done .tx{color:var(--faint);text-decoration:line-through}
 .todo .src{display:block;font-size:10.5px;color:var(--faint);letter-spacing:.04em}
 .todo.flag .tx{color:var(--red)}
+.todo .due{display:inline-block;margin-left:6px;font-size:11px;font-weight:600;color:var(--navy);background:#EAF0F8;border-radius:10px;padding:0 7px;white-space:nowrap}.todo .due.late{color:var(--red);background:var(--redsoft)}
+.todo .duein{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
 .todo .x{margin-left:auto;border:0;background:none;color:var(--faint);cursor:pointer;font-size:12px;padding:0 2px}
 .mtodo{display:flex;gap:8px;align-items:center;font-size:13px;padding:4px 0}
 .title{font:700 25px/1.15 var(--serif);margin:0 0 2px}
@@ -383,7 +385,7 @@ async function showHome() {
 }
 document.addEventListener('click', e => { const o = e.target.closest('[data-open]'); if (o) openFile(o.dataset.open); });
 /* ---------- Agent teams (each member signs in to their own portal; team files show for all of them) ---------- */
-const PAGE_VERSION = 'p57';   // bump with every dashboard update, so Lynne can see if her browser has the latest page
+const PAGE_VERSION = 'p58';   // bump with every dashboard update, so Lynne can see if her browser has the latest page
 let TEAM_EDIT = null;
 function sharedNote(t) {
   const g = {}; (t.members || []).forEach(m => { const k = String(m.email || '').trim().toLowerCase(); if (k) (g[k] = g[k] || []).push(String(m.name || '').split(/\s+/)[0]); });
@@ -636,6 +638,16 @@ function autoDates() {
   if (u.electric === 'Yes') out.push({ label: 'Electric meter reading', date: before(14), note: '2 weeks before closing' });
   return out;
 }
+// Lynne's own follow-ups (never in emails or the contract summary): to-dos with a due date, and the escrow overage
+// check request 7 days before closing when the commission statement shows our brokerage holding more than its fee
+function overageAmount() { const r = ((F.commissionCheck || {}).rows || []).find(x => x.label === 'Escrow overage'); const n = r ? Number(String(r.statement).replace(/[^0-9.]/g, '')) : 0; return n > 0 ? n : 0; }
+function myDates() {
+  const out = (F.todos || []).filter(t => t.due).map(t => ({ label: t.text, date: t.due, note: 'To do' + (t.src ? ' · ' + t.src : ''), done: !!t.done }));
+  const close = F.dates.closing, ov = overageAmount();
+  if (close && ov) { const p = close.split('-').map(Number), d = new Date(Date.UTC(p[0], p[1] - 1, p[2] - 7)).toISOString().slice(0, 10);
+    out.push({ label: 'Escrow overage check request ($' + ov.toLocaleString('en-US', { minimumFractionDigits: 2 }) + ')', date: d, note: '1 week before closing · agent completes the check request form', done: false }); }
+  return out;
+}
 // For the title email: who handles each proration / meter reading on this file
 function prorationLines() {
   const u = F.utilities || {}, out = [], town = (F.property || {}).town;
@@ -798,7 +810,10 @@ function renderTodo() {
   F.todos = F.todos || []; F.gapDone = F.gapDone || {};
   const gaps = feeGaps(), open = F.todos.filter(t => !t.done).length + gaps.filter(g => !F.gapDone[g.key]).length;
   const gapRow = g => '<label class="todo flag' + (F.gapDone[g.key] ? ' done' : '') + '"><input type="checkbox" data-gap="' + g.key + '"' + (F.gapDone[g.key] ? ' checked' : '') + '><span><span class="tx">' + esc(g.text) + '</span><span class="src">FEE CHECK</span></span></label>';
-  const todoRow = ([t, i]) => '<label class="todo' + (t.done ? ' done' : '') + '"><input type="checkbox" data-todo="' + i + '"' + (t.done ? ' checked' : '') + '><span><span class="tx">' + esc(t.text) + '</span>' + (t.src ? '<span class="src">' + esc(t.src.toUpperCase()) + '</span>' : '') + '</span><button class="x" data-deltodo="' + i + '" title="Remove">✕</button></label>';
+  const dueChip = t => t.due ? '<span class="due' + (!t.done && t.due < today() ? ' late' : '') + '">due ' + esc(fmtShort(t.due)) + '</span>' : '';
+  const todoRow = ([t, i]) => '<label class="todo' + (t.done ? ' done' : '') + '" style="position:relative"><input type="checkbox" data-todo="' + i + '"' + (t.done ? ' checked' : '') + '><span><span class="tx">' + esc(t.text) + '</span>' + dueChip(t) + (t.src ? '<span class="src">' + esc(t.src.toUpperCase()) + '</span>' : '') + '</span>' +
+    '<button class="x" data-duetodo="' + i + '" title="' + (t.due ? 'Change the due date' : 'Give it a due date (shows on the Calendar)') + '" style="margin-left:auto">📅</button><input type="date" class="duein" data-duein="' + i + '" value="' + esc(t.due || '') + '" tabindex="-1">' +
+    '<button class="x" data-deltodo="' + i + '" title="Remove" style="margin-left:0">✕</button></label>';
   const idx = F.todos.map((t, i) => [t, i]), doneN = gaps.filter(g => F.gapDone[g.key]).length + idx.filter(([t]) => t.done).length;
   $('#cTodo').innerHTML = '<div class="ch"><h3>To do · confirm</h3><span class="sub">' + open + ' open</span></div><div class="cb"><div class="tlist">' +
     gaps.filter(g => !F.gapDone[g.key]).map(gapRow).join('') + idx.filter(([t]) => !t.done).map(todoRow).join('') +
@@ -806,8 +821,14 @@ function renderTodo() {
     (doneN && !open ? '<div class="empty">All done.</div>' : '') +
     (SHOW_DONE.todo ? gaps.filter(g => F.gapDone[g.key]).map(gapRow).join('') + idx.filter(([t]) => t.done).map(todoRow).join('') : '') +
     '</div>' + doneToggle('todo', doneN, 'done') +
-    '<div class="btns" style="margin-top:8px"><input class="i" id="newTodo" placeholder="Add a to-do" style="flex:1"><button class="btn" id="addTodo">Add</button></div></div>';
-  $('#addTodo').onclick = () => { const v = $('#newTodo').value.trim(); if (!v) return; F.todos.push({ text: v, done: false, src: '' }); renderTodo(); changed(); };
+    '<div class="btns" style="margin-top:8px"><input class="i" id="newTodo" placeholder="Add a to-do" style="flex:1;min-width:140px"><input class="i" type="date" id="newDue" title="Due date (optional)" style="width:140px"><button class="btn" id="addTodo">Add</button></div></div>';
+  $('#addTodo').onclick = () => { const v = $('#newTodo').value.trim(); if (!v) return; const t = { text: v, done: false, src: '' }; if ($('#newDue').value) t.due = $('#newDue').value;
+    F.todos.push(t); renderTodo(); renderCal(); changed(); };
+  document.querySelectorAll('[data-duetodo]').forEach(b => b.onclick = e => { e.preventDefault(); e.stopPropagation();
+    const inp = document.querySelector('[data-duein="' + b.dataset.duetodo + '"]');
+    try { inp.showPicker(); } catch (err) { const v = prompt('Due date (YYYY-MM-DD), or leave empty to clear', inp.value); if (v !== null) { inp.value = v; inp.dispatchEvent(new Event('change')); } } });
+  document.querySelectorAll('[data-duein]').forEach(inp => inp.onchange = () => { const t = F.todos[+inp.dataset.duein]; if (!t) return;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(inp.value)) t.due = inp.value; else delete t.due; renderTodo(); renderCal(); changed(); });
 }
 
 // Who on the team can see this file in their portal: whoever started it always; anyone else only if Lynne ticks them
@@ -865,13 +886,15 @@ function renderCal() {
     .concat(autoDates().map(autoRow)).sort((a, b) => dateOrder(a.date, b.date, a.k, b.k));
   contract.forEach(x => { if (afterClosing(x.date, x.k)) x.html = x.html.replace('<div class="calrow"', '<div class="calrow" style="background:var(--redsoft)" title="This date is after closing"'); });
   const listing = (F.custom || []).map((c, i) => [c, i]).filter(([c]) => isListingDate(c.label)).map(([c, i]) => custRow(c, i)).sort((a, b) => -byDate(a, b));
+  const mine = myDates().map(m => ({ date: m.date, st: m.done ? 'met' : 'upcoming', html: '<div class="calrow" title="Only you see this. Change it in To do."><span>' + esc(m.label) + '<div class="small faint">' + esc(m.note) + '</div></span><span style="padding-left:9px">' + esc(fmt(m.date, true)) + '</span><span>' + (m.done ? '✓ done' : m.date < today() ? '<span style="color:var(--red);font-weight:600">Overdue</span>' : when(m.date)) + '</span></div>' })).sort(byDate);
   const head = t => '<div class="small muted" style="margin:10px 0 2px;font-weight:600;letter-spacing:.06em;text-transform:uppercase">' + t + '</div>';
-  const past = contract.concat(listing).filter(x => x.st === 'met').length;
+  const past = contract.concat(listing, mine).filter(x => x.st === 'met').length;
   const show = list => list.filter(x => x.st !== 'met' || SHOW_DONE.cal).map(x => x.html).join('');
   $('#cCal').innerHTML = '<div class="ch"><h3>Calendar</h3><span class="sub">Change any date here</span></div><div class="cb">' +
     (ua || !listing.length ? head('Contract dates') + show(contract) : '') +
     (listing.length ? head('Listing dates') + show(listing) : '') +
     (!ua && listing.length ? head('Contract dates') + show(contract) : '') +
+    (mine.length ? head('My follow-ups') + show(mine) : '') +
     ('<div class="row3" style="margin-top:10px;grid-template-columns:1fr 1fr 1fr 1fr">' +
       '<label class="f">Heating fuel<select class="i" data-path="utilities.fuel"><option></option>' + opt(['None', 'Oil', 'Propane', 'Oil & propane', 'Not sure'], (F.utilities || {}).fuel) + '</select></label>' +
       '<label class="f">Water / sewer<select class="i" data-path="utilities.waterSewer"><option></option>' + opt(['Water & sewer', 'Water only', 'Sewer only', 'No — private well & septic', 'Not sure'], (F.utilities || {}).waterSewer) + '</select></label>' +
