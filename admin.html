@@ -369,7 +369,7 @@ async function showHome() {
     '<div class="grid homegrid">' +
       '<div class="card"><div class="ch"><h3>Deadlines · next 14 days</h3></div><div class="cb">' +
         (S.upcoming.length ? S.upcoming.map(u => '<div class="up" data-open="' + esc(u.id) + '"><div><b>' + esc(u.address || u.id) + '</b><div class="small muted">' + esc(u.label) + '</div></div>' +
-          '<div style="text-align:right"><div>' + esc(fmt(u.date)) + '</div>' + when(u.date) + '</div></div>').join('') : '<div class="empty">No deadlines in the next two weeks.</div>') +
+          '<div style="text-align:right"><div>' + esc(fmt(u.date)) + '</div>' + (u.mine && u.days < 0 ? '<span style="color:var(--red);font-weight:600;font-size:12px">Overdue</span>' : when(u.date)) + '</div></div>').join('') : '<div class="empty">No deadlines in the next two weeks.</div>') +
       '</div></div>' +
       '<div class="board">' + lanes + '</div>' +
     '</div>' +
@@ -379,13 +379,61 @@ async function showHome() {
           .filter((c, i, a) => a.findIndex(z => String(z.email).toLowerCase() === String(c.email).toLowerCase()) === i).sort((a, b) => String(a.name).localeCompare(b.name)).map(c => '<option value="' + esc(c.email) + '">' + esc(c.name + (c.company ? ' · ' + c.company : '') + ' · ' + c.email) + '</option>').join('') +
       '</select><button class="btn primary" id="asGo">Open their portal</button></div>' +
       '<div class="small faint" style="margin-top:6px">Opens in a new tab, signed in as them for 12 hours. Anything you send goes on their file as if they sent it.</div></div></div>' +
+    '<div class="card" style="margin-top:18px" id="contactsCard"></div>' +
     '<div class="card" style="margin-top:18px" id="teamsCard"></div>' +
     (S.files.length ? '' : '<div class="banner" style="margin-top:18px"><div><b>Welcome to your TC Dashboard</b><div class="small muted">Start with "+ New file", "Read a new contract", or send an agent your File Input page.</div></div></div>');
-  renderTeams();
+  renderTeams(); renderContacts();
 }
 document.addEventListener('click', e => { const o = e.target.closest('[data-open]'); if (o) openFile(o.dataset.open); });
+/* ---------- Contacts: everyone saved from Parties, File Input and the rosters ---------- */
+const CT = { q: '', type: '', edit: null };
+const CONTACT_TYPES = ['Agent', 'Client', 'Title / attorney', 'Lender', 'Inspector', 'Other'];
+function contactFiles(c) {   // the open and closed files this person is on (from the file list)
+  const em = String(c.email || '').trim().toLowerCase(), nm = String(c.name || '').trim().toLowerCase();
+  return S.files.filter(f => (f.people || []).some(p => (em && p.e === em) || (!em && nm && p.n === nm)));
+}
+function renderContacts() {
+  const el = document.getElementById('contactsCard'); if (!el) return;
+  const q = CT.q.trim().toLowerCase();
+  const list = (S.contacts || []).filter(c => !c.shared && (!CT.type || (c.type || 'Other') === CT.type) &&
+      (!q || [c.name, c.company, c.email, c.phone].some(v => String(v || '').toLowerCase().indexOf(q) > -1)))
+    .sort((a, b) => String(a.name || a.email).localeCompare(String(b.name || b.email)));
+  const row = c => {
+    if (CT.edit && CT.edit.id === c.id) { const e = CT.edit;
+      return '<div class="up" style="cursor:default;display:block"><div class="row3" style="grid-template-columns:1.2fr 1.2fr 1.4fr 1fr 1fr;gap:6px">' +
+        [['name', 'Name'], ['company', 'Company'], ['email', 'Email'], ['phone', 'Phone']].map(([k, ph]) => '<input class="i" data-ce="' + k + '" value="' + esc(e[k] || '') + '" placeholder="' + ph + '">').join('') +
+        '<select class="i" data-ce="type">' + opt(CONTACT_TYPES, e.type || 'Other') + '</select></div>' +
+        '<div class="btns" style="margin-top:6px"><button class="btn ghost danger" id="ctDel">Delete</button><span style="flex:1"></span><button class="btn ghost" id="ctCancel">Cancel</button><button class="btn primary" id="ctSave">Save</button></div>' +
+        '<div class="small faint" style="margin-top:4px">Changing someone here doesn\'t change files already open. Their details on a file are in that file\'s Parties card.</div></div>'; }
+    const files = contactFiles(c);
+    return '<div class="up" style="cursor:default;align-items:flex-start"><div style="min-width:0"><b>' + esc(c.name || c.email) + '</b> <span class="chip">' + esc(c.type || 'Other') + '</span>' + (c.company ? ' <span class="small muted">' + esc(c.company) + '</span>' : '') +
+      '<div class="small">' + [c.email ? '<a href="mailto:' + esc(c.email) + '">' + esc(c.email) + '</a>' : '', esc(c.phone || '')].filter(Boolean).join(' · ') + '</div>' +
+      (files.length ? '<div class="small faint">On: ' + files.map(f => '<a href="#" data-open="' + esc(f.id) + '">' + esc(f.address || f.id) + '</a>').join(', ') + '</div>' : '') +
+      '</div><button class="btn small" data-ctedit="' + esc(c.id) + '">Edit</button></div>';
+  };
+  const shown = list.slice(0, q || CT.type ? 200 : 10);
+  el.innerHTML = '<div class="ch"><h3>Contacts</h3><span class="sub">' + plural((S.contacts || []).filter(c => !c.shared).length, 'contact') + ' · saved automatically from every file</span></div><div class="cb">' +
+    '<div class="btns" style="margin-bottom:8px"><input class="i" id="ctQ" placeholder="Search name, company, email or phone" value="' + esc(CT.q) + '" style="flex:1;min-width:200px">' +
+      '<select class="i" id="ctType" style="width:auto"><option value="">Everyone</option>' + opt(CONTACT_TYPES, CT.type) + '</select><button class="btn" id="ctNew">+ Add</button></div>' +
+    (CT.edit && !CT.edit.id ? row(CT.edit) : '') +
+    (shown.length ? shown.map(row).join('') : '<div class="empty">No one matches.</div>') +
+    (list.length > shown.length ? '<div class="small faint" style="margin-top:6px">Showing ' + shown.length + ' of ' + list.length + '. Search or pick a type to see the rest.</div>' : '') + '</div>';
+  const qi = $('#ctQ'); qi.oninput = () => { CT.q = qi.value; const pos = qi.selectionStart; renderContacts(); const n = $('#ctQ'); n.focus(); n.setSelectionRange(pos, pos); };
+  $('#ctType').onchange = e => { CT.type = e.target.value; renderContacts(); };
+  $('#ctNew').onclick = () => { CT.edit = { id: '', name: '', company: '', email: '', phone: '', type: CT.type || 'Agent' }; renderContacts(); };
+  el.querySelectorAll('[data-ctedit]').forEach(b => b.onclick = () => { CT.edit = Object.assign({}, S.contacts.find(c => c.id === b.dataset.ctedit)); renderContacts(); });
+  el.querySelectorAll('[data-ce]').forEach(i => i.oninput = i.onchange = () => { CT.edit[i.dataset.ce] = i.value; });
+  const cancel = $('#ctCancel'); if (cancel) cancel.onclick = () => { CT.edit = null; renderContacts(); };
+  const sv = $('#ctSave'); if (sv) sv.onclick = async () => { sv.disabled = true;
+    try { const c = Object.assign({}, CT.edit); if (!c.id) delete c.id; const r = await call('saveContact', { contact: c }); S.contacts = r.contacts; refreshContacts(); CT.edit = null; renderContacts(); toast('Contact saved'); }
+    catch (err) { sv.disabled = false; toast(err.message, true); } };
+  const dl = $('#ctDel'); if (dl) dl.onclick = async () => { if (!CT.edit.id) { CT.edit = null; return renderContacts(); }
+    if (!confirm('Delete ' + (CT.edit.name || CT.edit.email) + ' from your contacts? Files they are on keep their details.')) return;
+    try { const r = await call('deleteContact', { id: CT.edit.id }); S.contacts = r.contacts; refreshContacts(); CT.edit = null; renderContacts(); toast('Contact deleted'); }
+    catch (err) { toast(err.message, true); } };
+}
 /* ---------- Agent teams (each member signs in to their own portal; team files show for all of them) ---------- */
-const PAGE_VERSION = 'p58';   // bump with every dashboard update, so Lynne can see if her browser has the latest page
+const PAGE_VERSION = 'p59';   // bump with every dashboard update, so Lynne can see if her browser has the latest page
 let TEAM_EDIT = null;
 function sharedNote(t) {
   const g = {}; (t.members || []).forEach(m => { const k = String(m.email || '').trim().toLowerCase(); if (k) (g[k] = g[k] || []).push(String(m.name || '').split(/\s+/)[0]); });
