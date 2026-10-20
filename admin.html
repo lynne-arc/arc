@@ -383,7 +383,7 @@ async function showHome() {
 }
 document.addEventListener('click', e => { const o = e.target.closest('[data-open]'); if (o) openFile(o.dataset.open); });
 /* ---------- Agent teams (each member signs in to their own portal; team files show for all of them) ---------- */
-const PAGE_VERSION = 'p53';   // bump with every dashboard update, so Lynne can see if her browser has the latest page
+const PAGE_VERSION = 'p54';   // bump with every dashboard update, so Lynne can see if her browser has the latest page
 let TEAM_EDIT = null;
 function sharedNote(t) {
   const g = {}; (t.members || []).forEach(m => { const k = String(m.email || '').trim().toLowerCase(); if (k) (g[k] = g[k] || []).push(String(m.name || '').split(/\s+/)[0]); });
@@ -523,7 +523,8 @@ function changeText(c) {
   return '<span style="font-weight:600">' + esc(c.label) + '</span>' + (v ? ': ' + (was ? esc(was) + ' → ' : '') + esc(v) : '') + (c.deadline ? ', by ' + esc(fmtShort(c.deadline)) : '') + (c.text && (!v || c.key === 'other') ? '<div class="small muted">' + esc(c.text) + '</div>' : '');
 }
 function addendaBanners() {
-  return (F.addenda || []).filter(a => a.status === 'new').map(a =>
+  // oldest-signed first, the order they happened
+  return (F.addenda || []).filter(a => a.status === 'new').slice().sort((x, y) => (x.signedDate || x.at) < (y.signedDate || y.at) ? -1 : 1).map(a =>
     '<div class="banner" style="margin-bottom:16px;background:#FFF6D6;border-color:#E8D28E;align-items:flex-start"><div style="flex:1;min-width:240px">' +
       '<b>' + esc(a.title) + ' to check' + '</b><div class="small muted">Uploaded' + (a.by ? ' by ' + esc(a.by) : '') + ' ' + esc(new Date(a.at).toLocaleString('en-US', {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'})) +
       (a.signedDate ? ' · signed ' + esc(fmtShort(a.signedDate)) : '') + '. Untick anything that\'s wrong, then press Apply changes. Nothing on the file changes until you do.</div>' +
@@ -538,7 +539,8 @@ function wireAddenda() {
     const skip = Array.from(document.querySelectorAll('[data-addchg="' + id + '"]')).filter(x => !x.checked).map(x => Number(x.value));
     b.disabled = true; b.innerHTML = '<span class="spin"></span>';
     try { await flush(); const r = await call('addendumApply', { id: F.id, addId: id, apply, skip }); setFile(r.file, r.docs);
-      toast(apply ? 'Addendum applied. Dates and to-dos are updated.' : 'Left the file as it was.'); }
+      const done = (r.file.addenda || []).find(a => a.id === id) || { changes: [] }, kept = done.changes.filter(c => c.skipped === 'newer');
+      toast(!apply ? 'Left the file as it was.' : kept.length ? 'Applied. Kept ' + kept.map(c => c.label.toLowerCase() + ' from ' + c.newerTitle).join(', ') + ', which was signed later.' : 'Addendum applied. Dates and to-dos are updated.'); }
     catch (err) { toast(err.message, true); b.disabled = false; b.textContent = apply ? 'Apply changes' : 'Not needed'; }
   };
   document.querySelectorAll('[data-addapply]').forEach(b => b.onclick = () => go(b, true));
