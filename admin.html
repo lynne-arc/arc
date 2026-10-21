@@ -392,7 +392,9 @@ function contactFiles(c) {   // the open and closed files this person is on (fro
   const em = String(c.email || '').trim().toLowerCase(), nm = String(c.name || '').trim().toLowerCase();
   // a team email (frgroup@) is shared, so it only counts where the entry also names this person ("Kate & Jennifer", "Foss & Russell Group")
   const words = nm.split(/\s+/).filter(w => w.length > 2), shared = em && (S.contacts || []).some(x => x !== c && String(x.email || '').trim().toLowerCase() === em);
-  return S.files.filter(f => (f.people || []).some(p => (nm && p.n === nm) || (em && p.e === em && (!shared || words.some(w => p.n.split(/[^a-z]+/).indexOf(w) > -1)))));
+  // team leads ("All files") see every file on their team, whoever the agent is
+  const teams = (S.teams || []).filter(t => (t.members || []).some(m => m.allFiles && nm && String(m.name || '').trim().toLowerCase() === nm) || (nm && String(t.name || '').trim().toLowerCase() === nm)).map(t => t.id);
+  return S.files.filter(f => (f.team && teams.indexOf(f.team) > -1) || (f.people || []).some(p => (nm && p.n === nm) || (em && p.e === em && (!shared || words.some(w => p.n.split(/[^a-z]+/).indexOf(w) > -1)))));
 }
 function renderContacts() {
   const el = document.getElementById('contactsCard'); if (!el) return;
@@ -450,7 +452,7 @@ function renderContacts() {
     catch (err) { toast(err.message, true); } };
 }
 /* ---------- Agent teams (each member signs in to their own portal; team files show for all of them) ---------- */
-const PAGE_VERSION = 'p60';   // bump with every dashboard update, so Lynne can see if her browser has the latest page
+const PAGE_VERSION = 'p61';   // bump with every dashboard update, so Lynne can see if her browser has the latest page
 let TEAM_EDIT = null;
 function sharedNote(t) {
   const g = {}; (t.members || []).forEach(m => { const k = String(m.email || '').trim().toLowerCase(); if (k) (g[k] = g[k] || []).push(String(m.name || '').split(/\s+/)[0]); });
