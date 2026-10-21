@@ -380,8 +380,8 @@ async function showHome() {
           .filter((c, i, a) => a.findIndex(z => String(z.email).toLowerCase() === String(c.email).toLowerCase()) === i).sort((a, b) => String(a.name).localeCompare(b.name)).map(c => '<option value="' + esc(c.email) + '">' + esc(c.name + (c.company ? ' · ' + c.company : '') + ' · ' + c.email) + '</option>').join('') +
       '</select><button class="btn primary" id="asGo">Open their portal</button></div>' +
       '<div class="small faint" style="margin-top:6px">Opens in a new tab, signed in as them for 12 hours. Anything you send goes on their file as if they sent it.</div></div></div>' +
-    '<div class="card" style="margin-top:18px" id="contactsCard"></div>' +
     '<div class="card" style="margin-top:18px" id="teamsCard"></div>' +
+    '<div class="card" style="margin-top:18px" id="contactsCard"></div>' +
     (S.files.length ? '' : '<div class="banner" style="margin-top:18px"><div><b>Welcome to your TC Dashboard</b><div class="small muted">Start with "+ New file", "Read a new contract", or send an agent your File Input page.</div></div></div>');
   renderTeams(); renderContacts();
 }
@@ -453,7 +453,7 @@ function renderContacts() {
     catch (err) { toast(err.message, true); } };
 }
 /* ---------- Agent teams (each member signs in to their own portal; team files show for all of them) ---------- */
-const PAGE_VERSION = 'p63';   // bump with every dashboard update, so Lynne can see if her browser has the latest page
+const PAGE_VERSION = 'p64';   // bump with every dashboard update, so Lynne can see if her browser has the latest page
 let TEAM_EDIT = null;
 function sharedNote(t) {
   const g = {}; (t.members || []).forEach(m => { const k = String(m.email || '').trim().toLowerCase(); if (k) (g[k] = g[k] || []).push(String(m.name || '').split(/\s+/)[0]); });
