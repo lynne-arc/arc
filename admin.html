@@ -152,6 +152,20 @@ textarea.i{resize:vertical;line-height:1.55}
 /* home */
 .hello{font:700 34px/1.15 var(--serif);margin:4px 0 2px}
 .homegrid{grid-template-columns:minmax(300px,380px) minmax(0,1fr);margin-top:16px}
+.twoweek{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:1px;background:var(--line2)}
+.twoweek .day{background:#fff;min-height:96px;padding:6px 7px;min-width:0}
+.twoweek .day.we{background:var(--wash)}
+.twoweek .day.today{box-shadow:inset 0 0 0 2px var(--gold)}
+.twoweek .dh{font:600 11px var(--sans);color:var(--soft);margin-bottom:4px;display:flex;justify-content:space-between}
+.twoweek .ev{font-size:11.5px;line-height:1.25;padding:3px 5px;border-radius:5px;background:#EDF1F7;margin-bottom:3px;cursor:pointer;overflow:hidden}
+.twoweek .ev b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+.twoweek .ev span{display:block;color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.twoweek .ev.mine{background:var(--goldsoft)}
+.twoweek .ev:hover{outline:1px solid var(--navy2)}
+.twoweek .more{font-size:11px;color:var(--navy2);cursor:pointer}
+.overdue{padding:8px 14px;border-bottom:1px solid var(--line2);background:var(--redsoft);font-size:13px}
+.overdue a{color:var(--red);font-weight:600;margin-right:12px}
+@media (max-width:900px){.twoweek{grid-template-columns:1fr}.twoweek .day{min-height:0}.twoweek .day.empty{display:none}}
 @media (max-width:900px){.homegrid{grid-template-columns:1fr}}
 .homegrid>*{min-width:0}
 .board{display:grid;grid-template-columns:repeat(4,minmax(200px,1fr));gap:12px;overflow-x:auto}
@@ -367,13 +381,8 @@ async function showHome() {
       plural(S.upcoming.filter(u => u.days >= 0 && u.days <= 3).length, 'deadline') + ' in the next 3 days</p>' +
     (pend.length ? '<div class="banner" style="margin:16px 0"><div><b>' + pend.length + ' contract' + (pend.length > 1 ? 's' : '') + ' read and waiting for you</b><div class="small muted">Check the dates before they go into reminders.</div></div>' +
       '<div class="btns">' + pend.map(f => '<button class="btn gold" data-open="' + esc(f.id) + '">' + esc(f.address || f.id) + '</button>').join('') + '</div></div>' : '') +
-    '<div class="grid homegrid">' +
-      '<div class="card"><div class="ch"><h3>Deadlines · next 14 days</h3></div><div class="cb">' +
-        (S.upcoming.length ? S.upcoming.map(u => '<div class="up" data-open="' + esc(u.id) + '"><div><b>' + esc(u.address || u.id) + '</b><div class="small muted">' + esc(u.label) + '</div></div>' +
-          '<div style="text-align:right"><div>' + esc(fmt(u.date)) + '</div>' + (u.mine && u.days < 0 ? '<span style="color:var(--red);font-weight:600;font-size:12px">Overdue</span>' : when(u.date)) + '</div></div>').join('') : '<div class="empty">No deadlines in the next two weeks.</div>') +
-      '</div></div>' +
-      '<div class="board">' + lanes + '</div>' +
-    '</div>' +
+    twoWeeks() +
+    '<div class="board" style="margin-top:16px">' + lanes + '</div>' +
     '<div class="card" style="margin-top:18px"><div class="ch"><h3>Agent portal</h3><span class="sub">Open a file or add a P&amp;S for an agent</span></div><div class="cb">' +
       '<div class="btns"><select class="i" id="asAgent" style="flex:1;min-width:220px"><option value="">Choose an agent…</option>' +
         S.contacts.filter(c => c.type === 'Agent' && c.email && (S.clientAgents || []).indexOf(String(c.email).trim().toLowerCase()) > -1)
@@ -385,6 +394,27 @@ async function showHome() {
     (S.files.length ? '' : '<div class="banner" style="margin-top:18px"><div><b>Welcome to your TC Dashboard</b><div class="small muted">Start with "+ New file", "Read a new contract", or send an agent your File Input page.</div></div></div>');
   renderTeams(); renderContacts();
 }
+// Home: the next two weeks as a calendar strip, full width (today first), overdue follow-ups above it
+let TW_OPEN = {};
+function twoWeeks() {
+  const t0 = ymd(today()), byDay = {};
+  (S.upcoming || []).forEach(u => { if (u.days >= 0 && u.days < 14) (byDay[u.date] = byDay[u.date] || []).push(u); });
+  const late = (S.upcoming || []).filter(u => u.mine && u.days < 0);
+  const short = a => String(a || '').split(',')[0];
+  let cells = '';
+  for (let n = 0; n < 14; n++) {
+    const dt = new Date(t0 + n * 86400000), key = dt.toISOString().slice(0, 10), wd = dt.getUTCDay(), list = byDay[key] || [];
+    const show = TW_OPEN[key] ? list : list.slice(0, 4);
+    cells += '<div class="day' + (wd === 0 || wd === 6 ? ' we' : '') + (n === 0 ? ' today' : '') + (list.length ? '' : ' empty') + '">' +
+      '<div class="dh"><span>' + (n === 0 ? 'Today' : n === 1 ? 'Tomorrow' : esc(fmt(key))) + '</span>' + (n < 2 ? '<span class="faint">' + esc(fmt(key)) + '</span>' : '') + '</div>' +
+      show.map(u => '<div class="ev' + (u.mine ? ' mine' : '') + '" data-open="' + esc(u.id) + '" title="' + esc((u.address || u.id) + ' · ' + u.label) + '"><b>' + esc(short(u.address) || u.id) + '</b><span>' + esc(u.label) + '</span></div>').join('') +
+      (list.length > show.length ? '<div class="more" data-twmore="' + key + '">+' + (list.length - show.length) + ' more</div>' : '') + '</div>';
+  }
+  return '<div class="card" id="twoWeeks" style="margin-top:16px"><div class="ch"><h3>Deadlines · next 14 days</h3><span class="sub">Click any item to open its file · gold = your follow-ups</span></div>' +
+    (late.length ? '<div class="overdue"><b>Overdue:</b> ' + late.map(u => '<a href="#" data-open="' + esc(u.id) + '">' + esc(short(u.address) + ' · ' + u.label.replace(/^📌\s*/, '')) + ' (' + esc(fmt(u.date)) + ')</a>').join('') + '</div>' : '') +
+    '<div class="twoweek">' + cells + '</div></div>';
+}
+document.addEventListener('click', e => { const m = e.target.closest('[data-twmore]'); if (m) { TW_OPEN[m.dataset.twmore] = true; $('#twoWeeks').outerHTML = twoWeeks(); } });
 document.addEventListener('click', e => { const o = e.target.closest('[data-open]'); if (o) openFile(o.dataset.open); });
 /* ---------- Contacts: everyone saved from Parties, File Input and the rosters ---------- */
 const CT = { q: '', type: '', edit: null, all: false };
@@ -453,7 +483,7 @@ function renderContacts() {
     catch (err) { toast(err.message, true); } };
 }
 /* ---------- Agent teams (each member signs in to their own portal; team files show for all of them) ---------- */
-const PAGE_VERSION = 'p64';   // bump with every dashboard update, so Lynne can see if her browser has the latest page
+const PAGE_VERSION = 'p65';   // bump with every dashboard update, so Lynne can see if her browser has the latest page
 let TEAM_EDIT = null;
 function sharedNote(t) {
   const g = {}; (t.members || []).forEach(m => { const k = String(m.email || '').trim().toLowerCase(); if (k) (g[k] = g[k] || []).push(String(m.name || '').split(/\s+/)[0]); });
