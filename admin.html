@@ -157,10 +157,10 @@ textarea.i{resize:vertical;line-height:1.55}
 .twoweek .day.we{background:var(--wash)}
 .twoweek .day.today{box-shadow:inset 0 0 0 2px var(--gold)}
 .twoweek .dh{font:600 11px var(--sans);color:var(--soft);margin-bottom:4px;display:flex;justify-content:space-between}
-.twoweek .ev{font-size:11.5px;line-height:1.25;padding:3px 5px;border-radius:5px;background:#EDF1F7;margin-bottom:3px;cursor:pointer;overflow:hidden}
+.twoweek .ev{font-size:11.5px;line-height:1.25;padding:3px 5px 3px 6px;border-radius:5px;background:#EDF1F7;border-left:3px solid #3E64A8;margin-bottom:3px;cursor:pointer;overflow:hidden}
+.twnav{display:flex;gap:4px;margin-left:8px}.twnav .btn{padding:2px 9px;min-height:0}.twnav .btn[disabled]{opacity:.35;cursor:default}
 .twoweek .ev b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
 .twoweek .ev span{display:block;color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.twoweek .ev.mine{background:var(--goldsoft)}
 .twoweek .ev:hover{outline:1px solid var(--navy2)}
 .twoweek .more{font-size:11px;color:var(--navy2);cursor:pointer}
 .overdue{padding:8px 14px;border-bottom:1px solid var(--line2);background:var(--redsoft);font-size:13px}
@@ -395,26 +395,40 @@ async function showHome() {
   renderTeams(); renderContacts();
 }
 // Home: the next two weeks as a calendar strip, full width (today first), overdue follow-ups above it
-let TW_OPEN = {};
+let TW_OPEN = {}, TW_FROM = 0;   // TW_FROM: how many days past today the strip starts (moves a week at a time)
+// One color per property, the same everywhere on the calendar
+const PROP_COLORS = [['#E4ECF8', '#3E64A8'], ['#E3F1E8', '#2F7A4F'], ['#F8E6E4', '#A54444'], ['#EFE6F6', '#7A4BA0'], ['#FBEEDC', '#B26B12'], ['#E0F1F2', '#25808A'], ['#F6E4EE', '#A3406F'], ['#ECEBDF', '#6B6A3A']];
+function propColor(id) {
+  const ids = Array.from(new Set((S.files || []).map(f => f.id).concat((S.upcoming || []).map(u => u.id)))).sort(); const i = ids.indexOf(id);
+  return PROP_COLORS[(i < 0 ? 0 : i) % PROP_COLORS.length];
+}
 function twoWeeks() {
-  const t0 = ymd(today()), byDay = {};
-  (S.upcoming || []).forEach(u => { if (u.days >= 0 && u.days < 14) (byDay[u.date] = byDay[u.date] || []).push(u); });
+  const t0 = ymd(today()) + TW_FROM * 86400000, byDay = {};
+  (S.upcoming || []).forEach(u => { if (u.days >= TW_FROM && u.days < TW_FROM + 14) (byDay[u.date] = byDay[u.date] || []).push(u); });
+  const last = (S.upcoming || []).reduce((m, u) => Math.max(m, u.days), 0);
   const late = (S.upcoming || []).filter(u => u.mine && u.days < 0);
   const short = a => String(a || '').split(',')[0];
   let cells = '';
   for (let n = 0; n < 14; n++) {
     const dt = new Date(t0 + n * 86400000), key = dt.toISOString().slice(0, 10), wd = dt.getUTCDay(), list = byDay[key] || [];
     const show = TW_OPEN[key] ? list : list.slice(0, 4);
-    cells += '<div class="day' + (wd === 0 || wd === 6 ? ' we' : '') + (n === 0 ? ' today' : '') + (list.length ? '' : ' empty') + '">' +
-      '<div class="dh"><span>' + (n === 0 ? 'Today' : n === 1 ? 'Tomorrow' : esc(fmt(key))) + '</span>' + (n < 2 ? '<span class="faint">' + esc(fmt(key)) + '</span>' : '') + '</div>' +
-      show.map(u => '<div class="ev' + (u.mine ? ' mine' : '') + '" data-open="' + esc(u.id) + '" title="' + esc((u.address || u.id) + ' · ' + u.label) + '"><b>' + esc(short(u.address) || u.id) + '</b><span>' + esc(u.label) + '</span></div>').join('') +
+    const k = n + TW_FROM;
+    cells += '<div class="day' + (wd === 0 || wd === 6 ? ' we' : '') + (k === 0 ? ' today' : '') + (list.length ? '' : ' empty') + '">' +
+      '<div class="dh"><span>' + (k === 0 ? 'Today' : k === 1 ? 'Tomorrow' : esc(fmt(key))) + '</span>' + (k < 2 ? '<span class="faint">' + esc(fmt(key)) + '</span>' : '') + '</div>' +
+      show.map(u => { const c = propColor(u.id); return '<div class="ev' + (u.mine ? ' mine' : '') + '" style="background:' + c[0] + ';border-left-color:' + c[1] + '" data-open="' + esc(u.id) + '" title="' + esc((u.address || u.id) + ' · ' + u.label) + '"><b style="color:' + c[1] + '">' + esc(short(u.address) || u.id) + '</b><span>' + esc(u.label) + '</span></div>'; }).join('') +
       (list.length > show.length ? '<div class="more" data-twmore="' + key + '">+' + (list.length - show.length) + ' more</div>' : '') + '</div>';
   }
-  return '<div class="card" id="twoWeeks" style="margin-top:16px"><div class="ch"><h3>Deadlines · next 14 days</h3><span class="sub">Click any item to open its file · gold = your follow-ups</span></div>' +
+  const end = new Date(t0 + 13 * 86400000).toISOString().slice(0, 10), start = new Date(t0).toISOString().slice(0, 10);
+  const nav = '<span class="twnav"><button class="btn small" data-twgo="-7"' + (TW_FROM <= 0 ? ' disabled' : '') + ' title="Back a week">‹</button>' +
+    (TW_FROM ? '<button class="btn small" data-twgo="0">Today</button>' : '') +
+    '<button class="btn small" data-twgo="7"' + (TW_FROM + 14 > Math.max(last, 13) ? ' disabled' : '') + ' title="Forward a week">›</button></span>';
+  return '<div class="card" id="twoWeeks" style="margin-top:16px"><div class="ch"><h3>Deadlines · ' + (TW_FROM ? esc(fmt(start)) + ' – ' + esc(fmt(end)) : 'next 14 days') + '</h3>' +
+    '<span class="sub">Click an item to open its file · 📌 = your follow-ups</span>' + nav + '</div>' +
     (late.length ? '<div class="overdue"><b>Overdue:</b> ' + late.map(u => '<a href="#" data-open="' + esc(u.id) + '">' + esc(short(u.address) + ' · ' + u.label.replace(/^📌\s*/, '')) + ' (' + esc(fmt(u.date)) + ')</a>').join('') + '</div>' : '') +
     '<div class="twoweek">' + cells + '</div></div>';
 }
-document.addEventListener('click', e => { const m = e.target.closest('[data-twmore]'); if (m) { TW_OPEN[m.dataset.twmore] = true; $('#twoWeeks').outerHTML = twoWeeks(); } });
+document.addEventListener('click', e => { const m = e.target.closest('[data-twmore]'); if (m) { TW_OPEN[m.dataset.twmore] = true; $('#twoWeeks').outerHTML = twoWeeks(); }
+  const g = e.target.closest('[data-twgo]'); if (g) { e.stopPropagation(); const v = +g.dataset.twgo; TW_FROM = v === 0 ? 0 : Math.max(0, TW_FROM + v); $('#twoWeeks').outerHTML = twoWeeks(); } }, true);
 document.addEventListener('click', e => { const o = e.target.closest('[data-open]'); if (o) openFile(o.dataset.open); });
 /* ---------- Contacts: everyone saved from Parties, File Input and the rosters ---------- */
 const CT = { q: '', type: '', edit: null, all: false };
@@ -483,7 +497,7 @@ function renderContacts() {
     catch (err) { toast(err.message, true); } };
 }
 /* ---------- Agent teams (each member signs in to their own portal; team files show for all of them) ---------- */
-const PAGE_VERSION = 'p65';   // bump with every dashboard update, so Lynne can see if her browser has the latest page
+const PAGE_VERSION = 'p66';   // bump with every dashboard update, so Lynne can see if her browser has the latest page
 let TEAM_EDIT = null;
 function sharedNote(t) {
   const g = {}; (t.members || []).forEach(m => { const k = String(m.email || '').trim().toLowerCase(); if (k) (g[k] = g[k] || []).push(String(m.name || '').split(/\s+/)[0]); });
