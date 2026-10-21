@@ -37,6 +37,9 @@ a{color:var(--navy2)}
 .tbtn.gold{background:var(--gold);border-color:var(--gold);color:var(--navy);font-weight:600}
 .badge{font-size:11px;font-weight:600;padding:4px 8px;border-radius:20px;background:var(--ambersoft);color:var(--amber)}
 .savestate{font-size:12px;color:#C9D0DC;min-width:70px;text-align:right}
+.backupst{min-width:0;opacity:.7;text-decoration:none;white-space:nowrap}
+.backupst:hover{opacity:1;text-decoration:underline}
+.backupst.bad{opacity:1;background:#C62828;color:#fff;padding:3px 8px;border-radius:10px;font-weight:600}
 
 /* layout */
 .wrap{max-width:1560px;margin:0 auto;padding:22px 20px 60px}
@@ -236,6 +239,7 @@ textarea.i{resize:vertical;line-height:1.55}
     <span class="badge" id="testBadge" hidden>TEST MODE · drafts go to you</span>
     <span class="savestate" id="saveState"></span>
     <span class="savestate" id="engineVer" style="min-width:0;opacity:.7"></span>
+    <a class="savestate backupst" id="backupVer" target="_blank" rel="noopener" hidden></a>
   </header>
 
   <main id="home" class="wrap"></main>
@@ -318,6 +322,22 @@ function fileToB64(file) {
 
 /* =================== START =================== */
 $('#loginForm').addEventListener('submit', e => { e.preventDefault(); KEY = $('#keyIn').value.trim(); start(); });
+// "Backup: today 7:42 AM" next to the engine version; red when the last backup is over a day old or failed
+function showBackup(b) {
+  const el = $('#backupVer');
+  if (!b) { el.hidden = true; return; }   // engine older than v60
+  const at = b.at ? new Date(b.at) : null, hrs = at ? (Date.now() - at) / 36e5 : Infinity;
+  const day = d => d.toDateString(), now = new Date(), yest = new Date(now - 864e5);
+  const time = at ? ' ' + at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '';
+  const when = !at ? 'none yet' : day(at) === day(now) ? 'today' + time : day(at) === day(yest) ? 'yesterday' + time
+    : at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const bad = !!b.error || hrs > 26;
+  el.hidden = false;
+  el.href = b.folderUrl || '#';
+  el.classList.toggle('bad', bad);
+  el.textContent = (b.error ? 'Backup FAILED' : bad ? 'Backup late: ' : 'Backup: ') + (b.error ? '' : when);
+  el.title = (b.error ? 'Last backup failed: ' + b.error + '\n' : bad ? 'No backup in over a day. Check that the morning reminders still run.\n' : 'A copy of your ARC data is saved every morning; 30 days are kept.\n') + 'Click to open ARC Backups.';
+}
 async function start() {
   if (!KEY) { $('#login').hidden = false; return; }
   try {
@@ -326,6 +346,7 @@ async function start() {
     $('#login').hidden = true; $('#app').hidden = false;
     $('#testBadge').hidden = !S.settings.testMode;
     $('#engineVer').textContent = 'Page ' + PAGE_VERSION + ' · Engine ' + (S.settings.engine || 'OLD — redeploy Code.gs') + (S.settings.hasClaudeKey ? '' : ' · no Claude key');
+    showBackup(S.settings.backup);
     refreshContacts(); fillSelect(); showHome();
   } catch (err) {
     if (/authori/i.test(err.message)) { store('arcKey', null); KEY = ''; $('#loginMsg').textContent = 'That key didn\'t work — please check it and try again.'; }
@@ -521,7 +542,7 @@ function renderContacts() {
     catch (err) { toast(err.message, true); } };
 }
 /* ---------- Agent teams (each member signs in to their own portal; team files show for all of them) ---------- */
-const PAGE_VERSION = 'p67';   // bump with every dashboard update, so Lynne can see if her browser has the latest page
+const PAGE_VERSION = 'p68';   // bump with every dashboard update, so Lynne can see if her browser has the latest page
 let TEAM_EDIT = null;
 function sharedNote(t) {
   const g = {}; (t.members || []).forEach(m => { const k = String(m.email || '').trim().toLowerCase(); if (k) (g[k] = g[k] || []).push(String(m.name || '').split(/\s+/)[0]); });
