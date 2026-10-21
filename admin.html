@@ -387,7 +387,7 @@ async function showHome() {
 document.addEventListener('click', e => { const o = e.target.closest('[data-open]'); if (o) openFile(o.dataset.open); });
 /* ---------- Contacts: everyone saved from Parties, File Input and the rosters ---------- */
 const CT = { q: '', type: '', edit: null, all: false };
-const CONTACT_TYPES = ['Agent', 'Client', 'Title / attorney', 'Lender', 'Inspector', 'Other'];
+const CONTACT_TYPES = ['Agent', 'Client', 'Co-broke TC', 'Lender', 'Title / attorney', 'File processor', 'Inspector', 'Other'];
 function contactFiles(c) {   // the open and closed files this person is on (from the file list)
   const em = String(c.email || '').trim().toLowerCase(), nm = String(c.name || '').trim().toLowerCase();
   // a team email (frgroup@) is shared, so it only counts where the entry also names this person ("Kate & Jennifer", "Foss & Russell Group")
@@ -452,7 +452,7 @@ function renderContacts() {
     catch (err) { toast(err.message, true); } };
 }
 /* ---------- Agent teams (each member signs in to their own portal; team files show for all of them) ---------- */
-const PAGE_VERSION = 'p61';   // bump with every dashboard update, so Lynne can see if her browser has the latest page
+const PAGE_VERSION = 'p62';   // bump with every dashboard update, so Lynne can see if her browser has the latest page
 let TEAM_EDIT = null;
 function sharedNote(t) {
   const g = {}; (t.members || []).forEach(m => { const k = String(m.email || '').trim().toLowerCase(); if (k) (g[k] = g[k] || []).push(String(m.name || '').split(/\s+/)[0]); });
@@ -1004,8 +1004,23 @@ function officeLine(p, i) {
   }
   return '<div class="small" style="color:var(--red)">Office: ' + esc(offs.map(o => o.name).join(' / ')) + ' · no ' + esc(st || 'state') + ' office license on the roster</div>';
 }
+const PARTY_ROLES = ['Buyer', 'Seller', 'Listing agent', 'Buyer agent', 'Co-broke TC', 'Lender', 'Title / attorney', 'File processor', 'Inspector', 'Other'];
+// Same order on every file: our agent, our client, co-broke agent, co-broke TC, the other client, lender, title, file processor, the rest
+function partyRank(p) {
+  const buy = oursAs('Buyer agent') && !oursAs('Listing agent');
+  const ourAgent = buy ? 'Buyer agent' : 'Listing agent', theirAgent = buy ? 'Listing agent' : 'Buyer agent';
+  const ourClient = buy ? 'Buyer' : 'Seller', theirClient = buy ? 'Seller' : 'Buyer';
+  const order = [ourAgent, ourClient, theirAgent, 'Co-broke TC', theirClient, 'Lender', 'Title / attorney', 'File processor', 'Inspector', 'Other'];
+  const r = order.indexOf(p.role); return r < 0 ? order.length : r;
+}
+function sortParties() {
+  if (!F.parties) return;
+  const ix = new Map(F.parties.map((p, i) => [p, i]));
+  F.parties.sort((a, b) => partyRank(a) - partyRank(b) || (b.ours ? 1 : 0) - (a.ours ? 1 : 0) || ix.get(a) - ix.get(b));
+}
 function renderParties() {
-  const roles = S.settings.roles || [];
+  const roles = PARTY_ROLES.concat((S.settings.roles || []).filter(r => PARTY_ROLES.indexOf(r) < 0));
+  sortParties();
   $('#cParties').innerHTML = '<div class="ch"><h3>Parties</h3><span class="sub">Saved to your contacts automatically</span></div><div class="cb">' +
     ((F.parties || []).map((p, i) =>
       '<div class="party"><div class="ph"><select class="i" data-party="' + i + '" data-pf="role">' + opt(roles, p.role) + '</select>' +
@@ -1015,7 +1030,7 @@ function renderParties() {
         '<input class="i" list="dlNames" data-party="' + i + '" data-pf="name" value="' + esc(p.name) + '" placeholder="Name — start typing to pick a saved contact">' +
         '<div class="row2"><input class="i" list="dlEmails" type="email" data-party="' + i + '" data-pf="email" value="' + esc(p.email) + '" placeholder="Email">' +
         '<input class="i" data-party="' + i + '" data-pf="phone" value="' + esc(p.phone) + '" placeholder="Phone"></div>' +
-        '<input class="i" data-party="' + i + '" data-pf="company" value="' + esc(p.company) + '" placeholder="Company / brokerage">' +
+        '<input class="i" data-party="' + i + '" data-pf="company" value="' + esc(p.company) + '" placeholder="' + (p.role === 'File processor' ? 'Lender or title company they work for' : p.role === 'Co-broke TC' ? 'TC company (if any)' : 'Company / brokerage') + '">' +
         (/agent/i.test(p.role) ? '<input class="i" data-party="' + i + '" data-pf="license" value="' + esc(p.license || partyLicense(p)) + '" placeholder="' + esc(fileState() || 'State') + ' license #">' + officeLine(p, i) : '') +
         '<label class="small muted" style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-party="' + i + '" data-pf="reminders"' + (p.reminders !== false ? ' checked' : '') + '> Gets deadline reminders</label>' +
       '</div></div>').join('') || '<div class="empty">No one on this file yet.</div>') +
@@ -1353,6 +1368,7 @@ function onEdit(e) {
     if (k === 'affil') { p.affil = Object.assign({}, p.affil, { [fileState()]: el.value }); changed(); if (e.type === 'change') renderParties(); return; }
     p[k] = el.type === 'checkbox' ? el.checked : el.value;
     if (e.type === 'change' && (k === 'name' || k === 'email')) autofill(p, k) && renderParties();
+    if (e.type === 'change' && k === 'role') renderParties();
     changed();
   } else if (el.dataset.custom !== undefined) {
     F.custom[+el.dataset.custom][el.dataset.cf] = el.value; changed();
@@ -1407,10 +1423,13 @@ function autofill(p, by) {
   const v = String(p[by] || '').trim().toLowerCase(); if (!v) return false;
   const want = contactType(p.role);
   const pool = S.contacts.filter(c => String(c[by] || '').toLowerCase() === v);
-  const c = pool.find(x => x.type === want) || pool[0];
+  const c = pool.find(x => x.type === want && !x.shared) || pool.find(x => !x.shared) || pool[0];
   if (!c) return false;
   let did = false;
-  ['name', 'email', 'phone', 'company'].forEach(k => { if (!p[k] && c[k]) { p[k] = c[k]; did = true; } });
+  // picked a different saved person by name: swap in their details so the old person's email isn't left behind
+  const swap = by === 'name' && p.contactId && c.id !== p.contactId && !c.shared;
+  ['name', 'email', 'phone', 'company'].forEach(k => { if ((swap || !p[k]) && c[k] && p[k] !== c[k]) { p[k] = c[k]; did = true; } });
+  if (swap) { p.contactId = c.id; delete p.license; did = true; }
   if (did) toast('Filled in from your contacts: ' + c.name);
   return did;
 }
