@@ -351,6 +351,7 @@ async function showHome() {
   const pend = S.files.filter(f => f.pending);
   const lanes = LANES.map((l, i) => {
     const items = S.files.filter(f => l[1].indexOf(f.status) > -1);
+    if (l[0] === 'Under agreement') items.sort((a, b) => (a.closing || '9999') < (b.closing || '9999') ? -1 : (a.closing || '9999') > (b.closing || '9999') ? 1 : 0);   // soonest closing first, no date last
     return '<div class="lane l' + i + '"><h4>' + esc(l[0]) + ' · ' + items.length + '</h4>' +
       (items.length ? items.map(f => '<div class="deal" data-open="' + esc(f.id) + '"><b>' + esc(f.address || 'New file') + '</b>' +
         '<div class="small muted">' + esc([f.town, f.agent].filter(Boolean).join(' · ')) + '</div>' +
@@ -452,7 +453,7 @@ function renderContacts() {
     catch (err) { toast(err.message, true); } };
 }
 /* ---------- Agent teams (each member signs in to their own portal; team files show for all of them) ---------- */
-const PAGE_VERSION = 'p62';   // bump with every dashboard update, so Lynne can see if her browser has the latest page
+const PAGE_VERSION = 'p63';   // bump with every dashboard update, so Lynne can see if her browser has the latest page
 let TEAM_EDIT = null;
 function sharedNote(t) {
   const g = {}; (t.members || []).forEach(m => { const k = String(m.email || '').trim().toLowerCase(); if (k) (g[k] = g[k] || []).push(String(m.name || '').split(/\s+/)[0]); });
