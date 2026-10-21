@@ -386,11 +386,13 @@ async function showHome() {
 }
 document.addEventListener('click', e => { const o = e.target.closest('[data-open]'); if (o) openFile(o.dataset.open); });
 /* ---------- Contacts: everyone saved from Parties, File Input and the rosters ---------- */
-const CT = { q: '', type: '', edit: null };
+const CT = { q: '', type: '', edit: null, all: false };
 const CONTACT_TYPES = ['Agent', 'Client', 'Title / attorney', 'Lender', 'Inspector', 'Other'];
 function contactFiles(c) {   // the open and closed files this person is on (from the file list)
   const em = String(c.email || '').trim().toLowerCase(), nm = String(c.name || '').trim().toLowerCase();
-  return S.files.filter(f => (f.people || []).some(p => (em && p.e === em) || (!em && nm && p.n === nm)));
+  // a team email (frgroup@) is shared, so it only counts where the entry also names this person ("Kate & Jennifer", "Foss & Russell Group")
+  const words = nm.split(/\s+/).filter(w => w.length > 2), shared = em && (S.contacts || []).some(x => x !== c && String(x.email || '').trim().toLowerCase() === em);
+  return S.files.filter(f => (f.people || []).some(p => (nm && p.n === nm) || (em && p.e === em && (!shared || words.some(w => p.n.split(/[^a-z]+/).indexOf(w) > -1)))));
 }
 function renderContacts() {
   const el = document.getElementById('contactsCard'); if (!el) return;
@@ -403,6 +405,10 @@ function renderContacts() {
       return '<div class="up" style="cursor:default;display:block"><div class="row3" style="grid-template-columns:1.2fr 1.2fr 1.4fr 1fr 1fr;gap:6px">' +
         [['name', 'Name'], ['company', 'Company'], ['email', 'Email'], ['phone', 'Phone']].map(([k, ph]) => '<input class="i" data-ce="' + k + '" value="' + esc(e[k] || '') + '" placeholder="' + ph + '">').join('') +
         '<select class="i" data-ce="type">' + opt(CONTACT_TYPES, e.type || 'Other') + '</select></div>' +
+        (e.id ? '<div class="btns" style="margin-top:6px"><span class="small muted">Same person as</span><select class="i" id="ctMergeInto" style="width:auto;min-width:200px"><option value="">Pick who to keep…</option>' +
+          (S.contacts || []).filter(x => x.id !== e.id && !x.shared && (x.type || 'Other') === (e.type || 'Other')).sort((a, b) => String(a.name).localeCompare(b.name))
+            .map(x => '<option value="' + esc(x.id) + '">' + esc(x.name + (x.company ? ' · ' + x.company : '') + (x.phone ? ' · ' + x.phone : '')) + '</option>').join('') +
+          '</select><button class="btn" id="ctMerge" title="Keeps the one you pick, fills its blanks from this one, and moves every file over to it">Merge</button></div>' : '') +
         '<div class="btns" style="margin-top:6px"><button class="btn ghost danger" id="ctDel">Delete</button><span style="flex:1"></span><button class="btn ghost" id="ctCancel">Cancel</button><button class="btn primary" id="ctSave">Save</button></div>' +
         '<div class="small faint" style="margin-top:4px">Changing someone here doesn\'t change files already open. Their details on a file are in that file\'s Parties card.</div></div>'; }
     const files = contactFiles(c);
@@ -411,13 +417,24 @@ function renderContacts() {
       (files.length ? '<div class="small faint">On: ' + files.map(f => '<a href="#" data-open="' + esc(f.id) + '">' + esc(f.address || f.id) + '</a>').join(', ') + '</div>' : '') +
       '</div><button class="btn small" data-ctedit="' + esc(c.id) + '">Edit</button></div>';
   };
-  const shown = list.slice(0, q || CT.type ? 200 : 10);
+  const shown = list.slice(0, q || CT.type || CT.all ? 500 : 10);
   el.innerHTML = '<div class="ch"><h3>Contacts</h3><span class="sub">' + plural((S.contacts || []).filter(c => !c.shared).length, 'contact') + ' · saved automatically from every file</span></div><div class="cb">' +
     '<div class="btns" style="margin-bottom:8px"><input class="i" id="ctQ" placeholder="Search name, company, email or phone" value="' + esc(CT.q) + '" style="flex:1;min-width:200px">' +
       '<select class="i" id="ctType" style="width:auto"><option value="">Everyone</option>' + opt(CONTACT_TYPES, CT.type) + '</select><button class="btn" id="ctNew">+ Add</button></div>' +
     (CT.edit && !CT.edit.id ? row(CT.edit) : '') +
     (shown.length ? shown.map(row).join('') : '<div class="empty">No one matches.</div>') +
-    (list.length > shown.length ? '<div class="small faint" style="margin-top:6px">Showing ' + shown.length + ' of ' + list.length + '. Search or pick a type to see the rest.</div>' : '') + '</div>';
+    (list.length > shown.length ? '<div class="btns" style="margin-top:6px"><span class="small faint">Showing ' + shown.length + ' of ' + list.length + '.</span><button class="btn small" id="ctAll">Show all ' + list.length + '</button></div>'
+      : CT.all && list.length > 10 ? '<div class="btns" style="margin-top:6px"><button class="btn small" id="ctFew">Show fewer</button></div>' : '') + '</div>';
+  const sa = $('#ctAll'); if (sa) sa.onclick = () => { CT.all = true; renderContacts(); };
+  const sf = $('#ctFew'); if (sf) sf.onclick = () => { CT.all = false; renderContacts(); };
+  const mg = $('#ctMerge'); if (mg) mg.onclick = async () => {
+    const into = $('#ctMergeInto').value; if (!into) return toast('Pick the contact to keep first', true);
+    const k = S.contacts.find(x => x.id === into);
+    if (!confirm('Merge ' + (CT.edit.name || CT.edit.email) + ' into ' + k.name + '? Every file with ' + (CT.edit.name || 'them') + ' will show ' + k.name + ' instead, and this entry is removed.')) return;
+    mg.disabled = true;
+    try { const r = await call('mergeContact', { keepId: into, dropId: CT.edit.id }); S.contacts = r.contacts; S.files = r.files; refreshContacts(); CT.edit = null; renderContacts();
+      toast('Merged into ' + k.name + (r.changed ? ', ' + plural(r.changed, 'file') + ' updated' : '')); }
+    catch (err) { mg.disabled = false; toast(err.message, true); } };
   const qi = $('#ctQ'); qi.oninput = () => { CT.q = qi.value; const pos = qi.selectionStart; renderContacts(); const n = $('#ctQ'); n.focus(); n.setSelectionRange(pos, pos); };
   $('#ctType').onchange = e => { CT.type = e.target.value; renderContacts(); };
   $('#ctNew').onclick = () => { CT.edit = { id: '', name: '', company: '', email: '', phone: '', type: CT.type || 'Agent' }; renderContacts(); };
@@ -433,7 +450,7 @@ function renderContacts() {
     catch (err) { toast(err.message, true); } };
 }
 /* ---------- Agent teams (each member signs in to their own portal; team files show for all of them) ---------- */
-const PAGE_VERSION = 'p59';   // bump with every dashboard update, so Lynne can see if her browser has the latest page
+const PAGE_VERSION = 'p60';   // bump with every dashboard update, so Lynne can see if her browser has the latest page
 let TEAM_EDIT = null;
 function sharedNote(t) {
   const g = {}; (t.members || []).forEach(m => { const k = String(m.email || '').trim().toLowerCase(); if (k) (g[k] = g[k] || []).push(String(m.name || '').split(/\s+/)[0]); });
